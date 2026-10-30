@@ -32,6 +32,7 @@ export function PlayScene({
   onSelectTheme,
 }: PlaySceneProps) {
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const boardRef = useRef<HTMLDivElement>(null);
   const [showGainAnim, setShowGainAnim] = useState(false);
 
   useEffect(() => {
@@ -41,6 +42,26 @@ export function PlayScene({
       return () => clearTimeout(timer);
     }
   }, [lastGained, score]);
+
+  // Prevent native pull-to-refresh and page scroll while swiping on the board
+  useEffect(() => {
+    const boardEl = boardRef.current;
+    if (!boardEl) return;
+
+    const preventDefaultTouchMove = (e: TouchEvent) => {
+      if (e.cancelable) {
+        e.preventDefault();
+      }
+    };
+
+    boardEl.addEventListener("touchmove", preventDefaultTouchMove, {
+      passive: false,
+    });
+
+    return () => {
+      boardEl.removeEventListener("touchmove", preventDefaultTouchMove);
+    };
+  }, []);
 
   // Keyboard navigation strictly active during play scene
   useEffect(() => {
@@ -176,9 +197,11 @@ export function PlayScene({
 
       {/* The 4x4 Grid Board */}
       <div
+        ref={boardRef}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
-        className="grid aspect-square w-full grid-cols-4 grid-rows-4 gap-2.5 rounded-2xl bg-game-board p-2.5 shadow-md sm:gap-3.5 sm:p-3.5"
+        className="grid aspect-square w-full grid-cols-4 grid-rows-4 gap-2.5 rounded-2xl bg-game-board p-2.5 shadow-md sm:gap-3.5 sm:p-3.5 touch-none select-none"
+        style={{ touchAction: "none" }}
         aria-label="Tabuleiro do jogo 2048"
       >
         {board.map((row, r) =>
