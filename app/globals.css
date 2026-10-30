@@ -45,6 +45,21 @@
     --radius-2xl: calc(var(--radius) * 1.8);
     --radius-3xl: calc(var(--radius) * 2.2);
     --radius-4xl: calc(var(--radius) * 2.6);
+
+    /* 2048 Game Tokens */
+    --color-game-bg: var(--game-bg);
+    --color-game-bg-subtle: var(--game-bg-subtle);
+    --color-game-text: var(--game-text);
+    --color-game-text-muted: var(--game-text-muted);
+    --color-game-board: var(--game-board);
+    --color-game-cell-empty: var(--game-cell-empty);
+    --color-game-accent: var(--game-accent);
+    --color-game-accent-hover: var(--game-accent-hover);
+    --color-game-accent-text: var(--game-accent-text);
+    --color-game-card-bg: var(--game-card-bg);
+    --color-game-card-text: var(--game-card-text);
+    --color-game-card-label: var(--game-card-label);
+    --color-game-border: var(--game-border);
 }
 
 :root {
@@ -116,14 +131,186 @@
     --sidebar-ring: oklch(0.542 0.034 322.5);
 }
 
+/* ========================================================
+   2048 GAME THEMES & TOKEN SPECIFICATIONS
+   ======================================================== */
+
+/* 1. CLASSIC THEME */
+:root, [data-game-theme="classic"] {
+    --game-bg: #faf8ef;
+    --game-bg-subtle: #f4efe4;
+    --game-text: #776e65;
+    --game-text-muted: #8f7a66;
+    --game-board: #bbada0;
+    --game-cell-empty: rgba(238, 228, 218, 0.4);
+    --game-accent: #8f7a66;
+    --game-accent-hover: #776452;
+    --game-accent-text: #ffffff;
+    --game-card-bg: #bbada0;
+    --game-card-text: #ffffff;
+    --game-card-label: #eee4da;
+    --game-border: #d8cfc5;
+
+    --tile-2-bg: #eee4da;
+    --tile-2-text: #776e65;
+    --tile-4-bg: #ede0c8;
+    --tile-4-text: #776e65;
+    --tile-8-bg: #f2b179;
+    --tile-8-text: #ffffff;
+    --tile-16-bg: #f59563;
+    --tile-16-text: #ffffff;
+    --tile-32-bg: #f67c5f;
+    --tile-32-text: #ffffff;
+    --tile-64-bg: #f65e3b;
+    --tile-64-text: #ffffff;
+    --tile-128-bg: #edcf72;
+    --tile-128-text: #ffffff;
+    --tile-256-bg: #edcc61;
+    --tile-256-text: #ffffff;
+    --tile-512-bg: #edc850;
+    --tile-512-text: #ffffff;
+    --tile-1024-bg: #edc53f;
+    --tile-1024-text: #ffffff;
+    --tile-2048-bg: #edc22e;
+    --tile-2048-text: #ffffff;
+    --tile-super-bg: #3c3a32;
+    --tile-super-text: #ffffff;
+}
+
+/* 2. CYBERPUNK / SYNTHWAVE THEME */
+[data-game-theme="cyberpunk"] {
+    --game-bg: #090813;
+    --game-bg-subtle: #141126;
+    --game-text: #00f3ff;
+    --game-text-muted: #ff007f;
+    --game-board: #191233;
+    --game-cell-empty: rgba(255, 0, 127, 0.12);
+    --game-accent: #ff007f;
+    --game-accent-hover: #d6006b;
+    --game-accent-text: #ffffff;
+    --game-card-bg: #1e133c;
+    --game-card-text: #00f3ff;
+    --game-card-label: #ff60b0;
+    --game-border: #ff007f66;
+
+    --tile-2-bg: #1b1736;
+    --tile-2-text: #00f3ff;
+    --tile-4-bg: #271a4d;
+    --tile-4-text: #39ff14;
+    --tile-8-bg: #49176e;
+    --tile-8-text: #ffffff;
+    --tile-16-bg: #6c128f;
+    --tile-16-text: #ffffff;
+    --tile-32-bg: #9c0c9c;
+    --tile-32-text: #ffffff;
+    --tile-64-bg: #cf007d;
+    --tile-64-text: #ffffff;
+    --tile-128-bg: #ff007f;
+    --tile-128-text: #ffffff;
+    --tile-256-bg: #ff3c00;
+    --tile-256-text: #ffffff;
+    --tile-512-bg: #ff7700;
+    --tile-512-text: #090813;
+    --tile-1024-bg: #00f3ff;
+    --tile-1024-text: #090813;
+    --tile-2048-bg: #ffe600;
+    --tile-2048-text: #090813;
+    --tile-super-bg: #39ff14;
+    --tile-super-text: #090813;
+}
+
+/* 3. RETRO ARCADE (GAME BOY 8-BIT) */
+[data-game-theme="retro"] {
+    --game-bg: #8b956d;
+    --game-bg-subtle: #9bbc0f;
+    --game-text: #0f380f;
+    --game-text-muted: #306230;
+    --game-board: #306230;
+    --game-cell-empty: rgba(15, 56, 15, 0.28);
+    --game-accent: #0f380f;
+    --game-accent-hover: #1f4f1f;
+    --game-accent-text: #9bbc0f;
+    --game-card-bg: #0f380f;
+    --game-card-text: #9bbc0f;
+    --game-card-label: #8b956d;
+    --game-border: #0f380f;
+
+    --tile-2-bg: #9bbc0f;
+    --tile-2-text: #0f380f;
+    --tile-4-bg: #8bac0f;
+    --tile-4-text: #0f380f;
+    --tile-8-bg: #779c13;
+    --tile-8-text: #0f380f;
+    --tile-16-bg: #4f7d23;
+    --tile-16-text: #cadc9f;
+    --tile-32-bg: #396720;
+    --tile-32-text: #cadc9f;
+    --tile-64-bg: #275217;
+    --tile-64-text: #cadc9f;
+    --tile-128-bg: #1c4210;
+    --tile-128-text: #cadc9f;
+    --tile-256-bg: #14350c;
+    --tile-256-text: #9bbc0f;
+    --tile-512-bg: #0d2807;
+    --tile-512-text: #9bbc0f;
+    --tile-1024-bg: #081d04;
+    --tile-1024-text: #9bbc0f;
+    --tile-2048-bg: #031002;
+    --tile-2048-text: #9bbc0f;
+    --tile-super-bg: #000000;
+    --tile-super-text: #39ff14;
+}
+
+/* 4. MIDNIGHT / DARK ELEGANCE */
+[data-game-theme="midnight"] {
+    --game-bg: #0f172a;
+    --game-bg-subtle: #1e293b;
+    --game-text: #f8fafc;
+    --game-text-muted: #94a3b8;
+    --game-board: #1e293b;
+    --game-cell-empty: rgba(51, 65, 85, 0.45);
+    --game-accent: #6366f1;
+    --game-accent-hover: #4f46e5;
+    --game-accent-text: #ffffff;
+    --game-card-bg: #334155;
+    --game-card-text: #ffffff;
+    --game-card-label: #cbd5e1;
+    --game-border: #334155;
+
+    --tile-2-bg: #334155;
+    --tile-2-text: #f8fafc;
+    --tile-4-bg: #475569;
+    --tile-4-text: #f8fafc;
+    --tile-8-bg: #3b82f6;
+    --tile-8-text: #ffffff;
+    --tile-16-bg: #2563eb;
+    --tile-16-text: #ffffff;
+    --tile-32-bg: #6366f1;
+    --tile-32-text: #ffffff;
+    --tile-64-bg: #7c3aed;
+    --tile-64-text: #ffffff;
+    --tile-128-bg: #9333ea;
+    --tile-128-text: #ffffff;
+    --tile-256-bg: #c026d3;
+    --tile-256-text: #ffffff;
+    --tile-512-bg: #db2777;
+    --tile-512-text: #ffffff;
+    --tile-1024-bg: #f43f5e;
+    --tile-1024-text: #ffffff;
+    --tile-2048-bg: #f59e0b;
+    --tile-2048-text: #0f172a;
+    --tile-super-bg: #10b981;
+    --tile-super-text: #ffffff;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
-    }
+  }
   body {
     @apply bg-background text-foreground;
-    }
+  }
   html {
     @apply font-sans;
-    }
+  }
 }
