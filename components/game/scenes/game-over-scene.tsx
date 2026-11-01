@@ -10,7 +10,6 @@ import {
   Globe,
   Smartphone,
   ExternalLink,
-  Share2,
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 
@@ -47,7 +46,6 @@ export function GameOverScene({
 }: GameOverSceneProps) {
   const [initials, setInitials] = useState("");
   const [hasSavedLocal, setHasSavedLocal] = useState(false);
-  const [copiedShare, setCopiedShare] = useState(false);
   const [previewTab, setPreviewTab] = useState<"global" | "local">("global");
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -56,32 +54,6 @@ export function GameOverScene({
       inputRef.current?.focus();
     }
   }, [isEligibleForLocalRanking, hasSavedLocal]);
-
-  const handleShare = async () => {
-    const text = `🎮 Fiz ${score.toLocaleString("pt-BR")} pontos e alcancei o bloco ${highestTile} no DOBRA 2048! 🏆\nSerá que você consegue me passar?`;
-    const url = typeof window !== "undefined" ? window.location.origin : "https://dobra.vercel.app";
-
-    if (typeof navigator !== "undefined" && navigator.share) {
-      try {
-        await navigator.share({
-          title: "DOBRA 2048 Arcade",
-          text,
-          url,
-        });
-        return;
-      } catch {
-        // Fallback to clipboard if cancelled or unsupported
-      }
-    }
-
-    try {
-      await navigator.clipboard.writeText(`${text}\n${url}`);
-      setCopiedShare(true);
-      setTimeout(() => setCopiedShare(false), 2500);
-    } catch {
-      // Ignore
-    }
-  };
 
   const handleSubmitInitials = (e: React.FormEvent) => {
     e.preventDefault();
@@ -314,23 +286,6 @@ export function GameOverScene({
 
       {/* Action Buttons */}
       <div className="flex w-full flex-col gap-2.5">
-        <button
-          onClick={handleShare}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-game-accent bg-game-accent/15 py-3.5 px-6 text-sm font-black uppercase tracking-wider text-game-text hover:bg-game-accent/25 hover:scale-[1.01] active:scale-[0.99] transition-all shadow-xs"
-        >
-          {copiedShare ? (
-            <>
-              <Check className="h-4 w-4 text-green-600" />
-              <span>Copiado para a área de transferência!</span>
-            </>
-          ) : (
-            <>
-              <Share2 className="h-4 w-4 text-game-accent" />
-              <span>Compartilhar Resultado</span>
-            </>
-          )}
-        </button>
-
         <button
           onClick={onPlayAgain}
           className="flex w-full items-center justify-center gap-2.5 rounded-2xl bg-game-accent py-3.5 px-6 text-base font-black uppercase tracking-wider text-game-accent-text shadow-md transition-all hover:bg-game-accent-hover hover:scale-[1.01] active:scale-[0.99]"
