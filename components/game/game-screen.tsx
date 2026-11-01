@@ -31,6 +31,8 @@ import { MenuScene } from "./scenes/menu-scene";
 import { PlayScene } from "./scenes/play-scene";
 import { GameOverScene } from "./scenes/game-over-scene";
 import { RankingDialog } from "./ranking-dialog";
+import { WinDialog } from "./scenes/win-dialog";
+import { soundManager } from "@/lib/audio";
 
 export default function GameScreen() {
   const [scene, setScene] = useState<GameScene>("menu");
@@ -48,6 +50,9 @@ export default function GameScreen() {
   const [mounted, setMounted] = useState(false);
   const [player, setPlayer] = useState<PlayerProfile | null>(null);
   const [globalSynced, setGlobalSynced] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
+  const [isWinDialogOpen, setIsWinDialogOpen] = useState<boolean>(false);
+  const [hasAcknowledgedWin, setHasAcknowledgedWin] = useState<boolean>(false);
 
   // Security & anti-cheat session state
   const [movesCount, setMovesCount] = useState<number>(0);
@@ -133,11 +138,17 @@ export default function GameScreen() {
     setTheme(loadedTheme);
     setBestScore(loadedBest);
     setLocalRanking(loadedLocalRanking);
+    setSoundEnabled(soundManager.isEnabled());
 
     fetchPlayerSession();
     fetchGlobalRanking();
     setMounted(true);
   }, [fetchPlayerSession, fetchGlobalRanking]);
+
+  const handleToggleSound = () => {
+    const nextState = soundManager.toggle();
+    setSoundEnabled(nextState);
+  };
 
   const handleSelectTheme = (newTheme: GameTheme) => {
     setTheme(newTheme);
@@ -152,6 +163,8 @@ export default function GameScreen() {
     setMovesCount(0);
     setIsNewBest(false);
     setGlobalSynced(false);
+    setIsWinDialogOpen(false);
+    setHasAcknowledgedWin(false);
     setHasGameInProgress(true);
     setScene("play");
 
@@ -178,6 +191,22 @@ export default function GameScreen() {
         setMovesCount((prev) => prev + 1);
         setLastGained(result.gained);
 
+        // Sound feedback
+        if (result.gained > 0) {
+          const merged = Math.min(2048, result.gained);
+          soundManager.playMerge(merged);
+        } else {
+          soundManager.playMove();
+        }
+
+        // Win check (2048 reached for the first time)
+        const currentHighest = getHighestTile(result.board);
+        if (currentHighest >= 2048 && !hasAcknowledgedWin) {
+          setHasAcknowledgedWin(true);
+          setIsWinDialogOpen(true);
+          soundManager.playWin();
+        }
+
         setScore((oldScore) => {
           const newScore = oldScore + result.gained;
 
@@ -192,6 +221,7 @@ export default function GameScreen() {
 
           // Check game over
           if (!canMove(result.board)) {
+            soundManager.playGameOver();
             setHasGameInProgress(false);
             const highest = getHighestTile(result.board);
             setMovesCount((currentMoves) => {
@@ -210,7 +240,7 @@ export default function GameScreen() {
         return result.board;
       });
     },
-    [scene, syncScoreToGlobal]
+    [scene, syncScoreToGlobal, hasAcknowledgedWin]
   );
 
   const handleSaveLocalRanking = (initials: string) => {
@@ -273,6 +303,8 @@ export default function GameScreen() {
             player={player}
             onLoginGithub={handleLoginGithub}
             onLogoutGithub={handleLogoutGithub}
+            soundEnabled={soundEnabled}
+            onToggleSound={handleToggleSound}
           />
         )}
 
@@ -284,6 +316,8 @@ export default function GameScreen() {
             lastGained={lastGained}
             currentTheme={theme}
             player={player}
+            soundEnabled={soundEnabled}
+            onToggleSound={handleToggleSound}
             onMove={handleMove}
             onRestart={handleStartNewGame}
             onBackToMenu={() => setScene("menu")}
@@ -321,6 +355,17 @@ export default function GameScreen() {
         onClearLocalRanking={handleClearLocalRanking}
         player={player}
         onLoginGithub={handleLoginGithub}
+      />
+
+      {/* 2048 Victory Celebration Dialog */}
+      <WinDialog
+        isOpen={isWinDialogOpen}
+        score={score}
+        onContinue={() => setIsWinDialogOpen(false)}
+        onViewRanking={() => {
+          setIsWinDialogOpen(false);
+          setIsRankingOpen(true);
+        }}
       />
     </div>
   );

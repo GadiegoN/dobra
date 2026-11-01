@@ -8,6 +8,12 @@ import { cn } from "@/lib/utils";
 export const metadata: Metadata = {
   title: "DOBRA 2048 — Jogo Arcade com Ranking",
   description: "Junte os números, dobre os blocos e alcance o 2048. Jogue com temas visuais e dispute os rankings Local e Global.",
+  applicationName: "DOBRA 2048",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "DOBRA 2048",
+  },
   icons: {
     icon: [
       { url: "/icon.svg", type: "image/svg+xml" },

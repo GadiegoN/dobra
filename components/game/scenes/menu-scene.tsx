@@ -12,7 +12,11 @@ import {
   LogOut,
   Globe,
   ExternalLink,
+  Volume2,
+  VolumeX,
+  Download,
 } from "lucide-react";
+import { useEffect, useState } from "react";
 
 interface MenuSceneProps {
   bestScore: number;
@@ -27,6 +31,8 @@ interface MenuSceneProps {
   player: PlayerProfile | null;
   onLoginGithub: () => void;
   onLogoutGithub: () => void;
+  soundEnabled: boolean;
+  onToggleSound: () => void;
 }
 
 export function MenuScene({
@@ -42,7 +48,29 @@ export function MenuScene({
   player,
   onLoginGithub,
   onLogoutGithub,
+  soundEnabled,
+  onToggleSound,
 }: MenuSceneProps) {
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  useEffect(() => {
+    const handleBeforeInstall = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstall);
+    return () => window.removeEventListener("beforeinstallprompt", handleBeforeInstall);
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === "accepted") {
+      setDeferredPrompt(null);
+    }
+  };
   return (
     <div className="flex w-full max-w-lg flex-col items-center text-center animate-in fade-in zoom-in-95 duration-200">
       {/* Top GitHub User Bar */}
@@ -85,11 +113,18 @@ export function MenuScene({
           </button>
         )}
 
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 text-[11px] font-bold text-game-text-muted">
-            <Globe className="h-3 w-3 text-game-accent" />
-            <span className="hidden sm:inline">Ranking Neon Ativo</span>
-          </div>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={onToggleSound}
+            title={soundEnabled ? "Desativar som" : "Ativar som"}
+            className="flex h-7 w-7 items-center justify-center rounded-full border border-game-border bg-game-bg-subtle text-game-text-muted hover:text-game-text transition-colors"
+          >
+            {soundEnabled ? (
+              <Volume2 className="h-3.5 w-3.5 text-game-accent" />
+            ) : (
+              <VolumeX className="h-3.5 w-3.5 text-game-text-muted" />
+            )}
+          </button>
 
           <a
             href="https://github.com/GadiegoN/dobra"
@@ -178,6 +213,16 @@ export function MenuScene({
             </span>
           )}
         </button>
+
+        {deferredPrompt && (
+          <button
+            onClick={handleInstallClick}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-game-highlight bg-game-highlight/15 py-3 px-6 text-sm font-black uppercase tracking-wider text-game-text hover:bg-game-highlight/25 transition-all shadow-xs"
+          >
+            <Download className="h-4 w-4 text-game-highlight" />
+            <span>Instalar Aplicativo (PWA)</span>
+          </button>
+        )}
       </div>
 
       {/* Theme Picker Section */}

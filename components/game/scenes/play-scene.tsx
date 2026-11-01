@@ -3,7 +3,7 @@
 import { Board, Direction, GameTheme, PlayerProfile } from "@/types/game";
 import { BoardTile } from "../board-tile";
 import { ThemePicker } from "../theme-picker";
-import { ArrowLeft, RotateCcw } from "lucide-react";
+import { ArrowLeft, RotateCcw, Volume2, VolumeX } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 interface PlaySceneProps {
@@ -13,6 +13,8 @@ interface PlaySceneProps {
   lastGained: number;
   currentTheme: GameTheme;
   player: PlayerProfile | null;
+  soundEnabled: boolean;
+  onToggleSound: () => void;
   onMove: (dir: Direction) => void;
   onRestart: () => void;
   onBackToMenu: () => void;
@@ -26,6 +28,8 @@ export function PlayScene({
   lastGained,
   currentTheme,
   player,
+  soundEnabled,
+  onToggleSound,
   onMove,
   onRestart,
   onBackToMenu,
@@ -138,11 +142,25 @@ export function PlayScene({
           </div>
         )}
 
-        <ThemePicker
-          currentTheme={currentTheme}
-          onSelectTheme={onSelectTheme}
-          compact
-        />
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={onToggleSound}
+            title={soundEnabled ? "Desativar som" : "Ativar som"}
+            className="flex h-8 w-8 items-center justify-center rounded-xl border border-game-border bg-game-bg-subtle text-game-text-muted hover:text-game-text transition-colors shadow-2xs"
+          >
+            {soundEnabled ? (
+              <Volume2 className="h-4 w-4 text-game-accent" />
+            ) : (
+              <VolumeX className="h-4 w-4 text-game-text-muted" />
+            )}
+          </button>
+
+          <ThemePicker
+            currentTheme={currentTheme}
+            onSelectTheme={onSelectTheme}
+            compact
+          />
+        </div>
       </div>
 
       {/* Game HUD Header */}
