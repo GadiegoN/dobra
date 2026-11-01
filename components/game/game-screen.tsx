@@ -58,6 +58,33 @@ export default function GameScreen() {
   const [movesCount, setMovesCount] = useState<number>(0);
   const gameSessionTokenRef = useRef<string | null>(null);
 
+  // Synchronous game refs to prevent React StrictMode double-execution and input lag
+  const boardRef = useRef<Board>(board);
+  const scoreRef = useRef<number>(score);
+  const bestScoreRef = useRef<number>(bestScore);
+  const movesCountRef = useRef<number>(movesCount);
+  const hasWonRef = useRef<boolean>(hasAcknowledgedWin);
+
+  useEffect(() => {
+    boardRef.current = board;
+  }, [board]);
+
+  useEffect(() => {
+    scoreRef.current = score;
+  }, [score]);
+
+  useEffect(() => {
+    bestScoreRef.current = bestScore;
+  }, [bestScore]);
+
+  useEffect(() => {
+    movesCountRef.current = movesCount;
+  }, [movesCount]);
+
+  useEffect(() => {
+    hasWonRef.current = hasAcknowledgedWin;
+  }, [hasAcknowledgedWin]);
+
   // Fetch global ranking from Neon
   const fetchGlobalRanking = useCallback(async () => {
     try {
@@ -157,6 +184,11 @@ export default function GameScreen() {
 
   const handleStartNewGame = async () => {
     const initialBoard = newGame();
+    boardRef.current = initialBoard;
+    scoreRef.current = 0;
+    movesCountRef.current = 0;
+    hasWonRef.current = false;
+
     setBoard(initialBoard);
     setScore(0);
     setLastGained(0);
@@ -184,63 +216,62 @@ export default function GameScreen() {
     (direction: Direction) => {
       if (scene !== "play") return;
 
-      setBoard((currentBoard) => {
-        const result = moveBoard(currentBoard, direction);
-        if (!result.changed) return currentBoard;
+      const currentBoard = boardRef.current;
+      const result = moveBoard(currentBoard, direction);
+      if (!result.changed) return;
 
-        setMovesCount((prev) => prev + 1);
-        setLastGained(result.gained);
+      // 1. Update Board synchronously in ref and reactively in state
+      boardRef.current = result.board;
+      setBoard(result.board);
 
-        // Sound feedback
-        if (result.gained > 0) {
-          const merged = Math.min(2048, result.gained);
-          soundManager.playMerge(merged);
-        } else {
-          soundManager.playMove();
-        }
+      // 2. Update Moves count
+      const nextMoves = movesCountRef.current + 1;
+      movesCountRef.current = nextMoves;
+      setMovesCount(nextMoves);
+      setLastGained(result.gained);
 
-        // Win check (2048 reached for the first time)
-        const currentHighest = getHighestTile(result.board);
-        if (currentHighest >= 2048 && !hasAcknowledgedWin) {
-          setHasAcknowledgedWin(true);
-          setIsWinDialogOpen(true);
-          soundManager.playWin();
-        }
+      // 3. Audio Feedback (executed strictly once per move)
+      if (result.gained > 0) {
+        const merged = Math.min(2048, result.gained);
+        soundManager.playMerge(merged);
+      } else {
+        soundManager.playMove();
+      }
 
-        setScore((oldScore) => {
-          const newScore = oldScore + result.gained;
+      // 4. Update Score (strictly single addition, no StrictMode double-execution)
+      const newScore = scoreRef.current + result.gained;
+      scoreRef.current = newScore;
+      setScore(newScore);
 
-          setBestScore((prevBest) => {
-            if (newScore > prevBest) {
-              setIsNewBest(true);
-              saveBestScore(newScore);
-              return newScore;
-            }
-            return prevBest;
-          });
+      // 5. Update Best Score
+      if (newScore > bestScoreRef.current) {
+        bestScoreRef.current = newScore;
+        setIsNewBest(true);
+        setBestScore(newScore);
+        saveBestScore(newScore);
+      }
 
-          // Check game over
-          if (!canMove(result.board)) {
-            soundManager.playGameOver();
-            setHasGameInProgress(false);
-            const highest = getHighestTile(result.board);
-            setMovesCount((currentMoves) => {
-              syncScoreToGlobal(newScore, highest, currentMoves + 1);
-              return currentMoves + 1;
-            });
+      // 6. Win check (2048 reached for the first time)
+      const currentHighest = getHighestTile(result.board);
+      if (currentHighest >= 2048 && !hasWonRef.current) {
+        hasWonRef.current = true;
+        setHasAcknowledgedWin(true);
+        setIsWinDialogOpen(true);
+        soundManager.playWin();
+      }
 
-            setTimeout(() => {
-              setScene("gameover");
-            }, 400);
-          }
+      // 7. Game Over check
+      if (!canMove(result.board)) {
+        soundManager.playGameOver();
+        setHasGameInProgress(false);
+        syncScoreToGlobal(newScore, currentHighest, nextMoves);
 
-          return newScore;
-        });
-
-        return result.board;
-      });
+        setTimeout(() => {
+          setScene("gameover");
+        }, 400);
+      }
     },
-    [scene, syncScoreToGlobal, hasAcknowledgedWin]
+    [scene, syncScoreToGlobal]
   );
 
   const handleSaveLocalRanking = (initials: string) => {
