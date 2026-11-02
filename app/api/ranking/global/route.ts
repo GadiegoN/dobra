@@ -1,20 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb, ensureLeaderboardTable } from "@/lib/db";
 import { getPlayerSession } from "@/lib/auth";
-import { GlobalRankingEntry } from "@/types/game";
+import { Direction, GlobalRankingEntry } from "@/types/game";
 import {
   validateScoreSanity,
   verifyGameSessionToken,
   validateGameDuration,
   markSessionConsumed,
+  isSessionConsumed,
+  verifyGameReplay,
 } from "@/lib/security";
+
+interface DbLeaderboardRow {
+  id: string;
+  github_id: string;
+  username: string;
+  display_name: string | null;
+  avatar_url: string;
+  score: number;
+  highest_tile: number;
+  github_profile_url: string;
+  created_at: string | Date;
+  updated_at: string | Date;
+}
 
 export async function GET() {
   try {
     const sql = getDb();
     await ensureLeaderboardTable();
 
-    const rows = await sql`
+    const rows = (await sql`
       SELECT 
         id,
         github_id,
@@ -29,9 +44,9 @@ export async function GET() {
       FROM leaderboard
       ORDER BY score DESC, updated_at ASC
       LIMIT 50;
-    `;
+    `) as unknown as DbLeaderboardRow[];
 
-    const ranking: GlobalRankingEntry[] = rows.map((r: any) => ({
+    const ranking: GlobalRankingEntry[] = rows.map((r) => ({
       id: String(r.id),
       githubId: String(r.github_id),
       username: String(r.username),
@@ -69,6 +84,7 @@ export async function POST(request: NextRequest) {
     const score = Number(body.score || 0);
     const highestTile = Number(body.highestTile || 2);
     const movesCount = Number(body.movesCount || 0);
+    const moves = Array.isArray(body.moves) ? (body.moves as Direction[]) : undefined;
     const gameToken = body.gameToken as string | undefined;
 
     // 2. Mathematical Sanity Checks (Multiples of 4, power of 2, logical bounds)
@@ -92,6 +108,14 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      const consumed = await isSessionConsumed(tokenVerification.payload.sessionId);
+      if (consumed) {
+        return NextResponse.json(
+          { error: "Esta partida já foi registrada (replay attack)" },
+          { status: 403 }
+        );
+      }
+
       const durationCheck = validateGameDuration(
         tokenVerification.payload.startedAt,
         score,
@@ -105,17 +129,35 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // If full moves array is sent along with seed, verify deterministic replay
+      if (moves && tokenVerification.payload.seed) {
+        const replayCheck = verifyGameReplay(
+          tokenVerification.payload.seed,
+          moves,
+          score,
+          highestTile,
+          "classic"
+        );
+        if (!replayCheck.valid) {
+          console.warn(`[Anti-Cheat] Replay mismatch for @${player.username}:`, replayCheck.reason);
+          return NextResponse.json(
+            { error: `Partida adulterada: ${replayCheck.reason}` },
+            { status: 400 }
+          );
+        }
+      }
+
       // Mark token consumed to prevent replay attack
-      markSessionConsumed(tokenVerification.payload.sessionId);
+      await markSessionConsumed(tokenVerification.payload.sessionId, player.githubId);
     }
 
     const sql = getDb();
     await ensureLeaderboardTable();
 
     // 4. Rate Limiting: Minimum 5 seconds between consecutive score saves per user
-    const existing = await sql`
+    const existing = (await sql`
       SELECT updated_at, score FROM leaderboard WHERE github_id = ${player.githubId} LIMIT 1;
-    `;
+    `) as unknown as Array<{ updated_at: string | Date; score: number }>;
 
     if (existing.length > 0) {
       const lastUpdated = new Date(existing[0].updated_at).getTime();

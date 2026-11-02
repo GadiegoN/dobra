@@ -1,4 +1,7 @@
 import crypto from "crypto";
+import { getDb, ensureDatabaseSchema } from "./db";
+import { Direction, GameMode, ModeRules } from "@/types/game";
+import { replayGame } from "./game-engine";
 
 const VALID_TILES = new Set([
   2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072,
@@ -7,13 +10,12 @@ const VALID_TILES = new Set([
 // Absolute theoretical maximum score in 4x4 2048
 export const ABSOLUTE_MAX_SCORE = 3932156;
 
-// In-memory set of recently consumed session IDs to prevent replay attacks
-const consumedSessions = new Set<string>();
+// In-memory fallback cache of recently consumed session IDs
+const memoryConsumedSessions = new Set<string>();
 
-// Keep memory clean by pruning periodically
 setInterval(() => {
-  if (consumedSessions.size > 5000) {
-    consumedSessions.clear();
+  if (memoryConsumedSessions.size > 5000) {
+    memoryConsumedSessions.clear();
   }
 }, 1000 * 60 * 30); // 30 minutes
 
@@ -28,13 +30,15 @@ function getSigningSecret(): string {
 export interface GameSessionPayload {
   sessionId: string;
   githubId: string;
+  seed: number;
   startedAt: number;
 }
 
-export function createGameSessionToken(githubId: string): string {
+export function createGameSessionToken(githubId: string, seed: number = Date.now()): string {
   const payload: GameSessionPayload = {
     sessionId: crypto.randomUUID(),
     githubId,
+    seed,
     startedAt: Date.now(),
   };
 
@@ -79,7 +83,7 @@ export function verifyGameSessionToken(
       return { valid: false, reason: "Token não pertence a este usuário" };
     }
 
-    if (consumedSessions.has(payload.sessionId)) {
+    if (memoryConsumedSessions.has(payload.sessionId)) {
       return { valid: false, reason: "Esta partida já foi registrada (replay attack)" };
     }
 
@@ -89,8 +93,33 @@ export function verifyGameSessionToken(
   }
 }
 
-export function markSessionConsumed(sessionId: string) {
-  consumedSessions.add(sessionId);
+export async function isSessionConsumed(sessionId: string): Promise<boolean> {
+  if (memoryConsumedSessions.has(sessionId)) return true;
+  try {
+    const sql = getDb();
+    await ensureDatabaseSchema();
+    const rows = await sql`
+      SELECT session_id FROM consumed_game_sessions WHERE session_id = ${sessionId} LIMIT 1;
+    `;
+    return rows.length > 0;
+  } catch {
+    return memoryConsumedSessions.has(sessionId);
+  }
+}
+
+export async function markSessionConsumed(sessionId: string, githubId: string = "anonymous") {
+  memoryConsumedSessions.add(sessionId);
+  try {
+    const sql = getDb();
+    await ensureDatabaseSchema();
+    await sql`
+      INSERT INTO consumed_game_sessions (session_id, github_id)
+      VALUES (${sessionId}, ${githubId})
+      ON CONFLICT (session_id) DO NOTHING;
+    `;
+  } catch (error) {
+    console.error("Error marking session consumed in db:", error);
+  }
 }
 
 /**
@@ -121,8 +150,6 @@ export function validateScoreSanity(
   }
 
   // Calculate theoretical minimum score to produce this tile alone:
-  // k = log2(highestTile)
-  // minScore ≈ (k - 1) * 2^k * 0.8
   const k = Math.round(Math.log2(highestTile));
   if (k >= 2) {
     const theoreticalMin = Math.floor((k - 1) * Math.pow(2, k) * 0.75);
@@ -135,8 +162,6 @@ export function validateScoreSanity(
   }
 
   // Calculate maximum plausible score for a given highest tile:
-  // E.g., you cannot achieve 200,000 points while your highest tile is only 256.
-  // In a 4x4 grid, if you have 200k points, tiles inevitably merge into higher tiers.
   const maxPlausibleForTile: Record<number, number> = {
     2: 100,
     4: 400,
@@ -170,7 +195,7 @@ export function validateScoreSanity(
 
 /**
  * Validates gameplay duration and move speed:
- * - A human player needs at least ~40ms per move.
+ * - A human player needs at least ~35ms per move.
  * - Higher scores require minimum moves.
  */
 export function validateGameDuration(
@@ -180,7 +205,6 @@ export function validateGameDuration(
 ): { valid: boolean; reason?: string } {
   const durationMs = Date.now() - startedAt;
 
-  // Game must have started in the past, but not more than 48 hours ago
   if (durationMs < 500) {
     return { valid: false, reason: "Partida rápida demais para ser humana (< 0.5s)" };
   }
@@ -189,7 +213,6 @@ export function validateGameDuration(
     return { valid: false, reason: "Sessão de partida expirada (> 48h)" };
   }
 
-  // To achieve a score of X, you need at least (score / 40) moves
   if (score >= 1000) {
     const minEstimatedMoves = Math.floor(score / 45);
     if (movesCount > 0 && movesCount < minEstimatedMoves) {
@@ -199,7 +222,6 @@ export function validateGameDuration(
       };
     }
 
-    // Minimum time: at least 35ms per estimated move
     const minTimeMs = minEstimatedMoves * 35;
     if (durationMs < minTimeMs) {
       return {
@@ -212,3 +234,41 @@ export function validateGameDuration(
   return { valid: true };
 }
 
+/**
+ * Full Replay Verification:
+ * Validates player submitted moves deterministically against the session seed.
+ */
+export function verifyGameReplay(
+  seed: number,
+  moves: Direction[],
+  claimedScore: number,
+  claimedHighestTile: number,
+  mode: GameMode = "classic",
+  rules?: ModeRules
+): { valid: boolean; calculatedScore: number; calculatedHighestTile: number; reason?: string } {
+  const replay = replayGame(seed, moves, mode, rules);
+
+  if (replay.score !== claimedScore) {
+    return {
+      valid: false,
+      calculatedScore: replay.score,
+      calculatedHighestTile: replay.highestTile,
+      reason: `Pontuação calculada (${replay.score}) difere da reivindicada (${claimedScore})`,
+    };
+  }
+
+  if (replay.highestTile !== claimedHighestTile) {
+    return {
+      valid: false,
+      calculatedScore: replay.score,
+      calculatedHighestTile: replay.highestTile,
+      reason: `Maior peça calculada (${replay.highestTile}) difere da reivindicada (${claimedHighestTile})`,
+    };
+  }
+
+  return {
+    valid: true,
+    calculatedScore: replay.score,
+    calculatedHighestTile: replay.highestTile,
+  };
+}

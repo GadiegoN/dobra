@@ -1,7 +1,9 @@
 "use client";
 
-import { GameTheme, GameThemeOption } from "@/types/game";
-import { Palette, Check } from "lucide-react";
+import { useState, useEffect } from "react";
+import { GameTheme, GameThemeOption, PersonalStats } from "@/types/game";
+import { Palette, Check, Lock } from "lucide-react";
+import { getLocalHistory, computeStatsFromHistory } from "@/lib/stats";
 
 export const THEMES: GameThemeOption[] = [
   {
@@ -28,7 +30,48 @@ export const THEMES: GameThemeOption[] = [
     description: "Dark slate moderno com acentos índigo",
     previewColors: ["#0f172a", "#334155", "#6366f1"],
   },
+  {
+    id: "sunset",
+    name: "Sunset",
+    description: "Gradiente crepuscular âmbar e carmesim",
+    previewColors: ["#2b1329", "#ff6b6b", "#ffe46b"],
+    condition: {
+      type: "tile",
+      value: 1024,
+      description: "Desbloqueie alcançando a peça 1024",
+    },
+  },
+  {
+    id: "emerald",
+    name: "Esmeralda",
+    description: "Verde jade místico com destaques dourados",
+    previewColors: ["#062319", "#10b981", "#fbbf24"],
+    condition: {
+      type: "score",
+      value: 10000,
+      description: "Desbloqueie atingindo 10.000 pontos",
+    },
+  },
 ];
+
+export function isThemeUnlocked(
+  theme: GameThemeOption,
+  stats: PersonalStats | null
+): boolean {
+  if (!theme.condition) return true;
+  if (!stats) return false;
+
+  if (theme.condition.type === "tile") {
+    return stats.highestTile >= Number(theme.condition.value);
+  }
+  if (theme.condition.type === "score") {
+    return stats.bestScore >= Number(theme.condition.value);
+  }
+  if (theme.condition.type === "games_played") {
+    return stats.totalGames >= Number(theme.condition.value);
+  }
+  return false;
+}
 
 interface ThemePickerProps {
   currentTheme: GameTheme;
@@ -41,6 +84,31 @@ export function ThemePicker({
   onSelectTheme,
   compact = false,
 }: ThemePickerProps) {
+  const [stats, setStats] = useState<PersonalStats | null>(null);
+  const [lockedNotice, setLockedNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      const history = getLocalHistory();
+      setStats(computeStatsFromHistory(history));
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const handleSelect = (theme: GameThemeOption) => {
+    const unlocked = isThemeUnlocked(theme, stats);
+    if (!unlocked) {
+      setLockedNotice(
+        theme.condition?.description || "Bloqueado: cumpra os requisitos do jogo para liberar!"
+      );
+      setTimeout(() => setLockedNotice(null), 3500);
+      return;
+    }
+    setLockedNotice(null);
+    onSelectTheme(theme.id);
+  };
+
   if (compact) {
     return (
       <div className="flex items-center gap-1 rounded-xl border border-game-border bg-game-bg-subtle p-1 shadow-xs">
@@ -48,22 +116,29 @@ export function ThemePicker({
         <div className="flex gap-1">
           {THEMES.map((t) => {
             const isActive = t.id === currentTheme;
+            const unlocked = isThemeUnlocked(t, stats);
             return (
               <button
                 key={t.id}
                 type="button"
-                onClick={() => onSelectTheme(t.id)}
-                title={`${t.name}: ${t.description}`}
+                onClick={() => handleSelect(t)}
+                title={unlocked ? `${t.name}: ${t.description}` : `🔒 ${t.name}: ${t.condition?.description}`}
                 className={`flex h-6.5 items-center gap-1.5 rounded-lg px-2 text-xs font-bold transition-all ${
                   isActive
                     ? "bg-game-accent text-game-accent-text shadow-xs"
-                    : "text-game-text-muted hover:text-game-text"
+                    : unlocked
+                    ? "text-game-text-muted hover:text-game-text"
+                    : "opacity-60 text-game-text-muted hover:opacity-100"
                 }`}
               >
-                <span
-                  className="h-2.5 w-2.5 shrink-0 rounded-full border border-black/20"
-                  style={{ backgroundColor: t.previewColors[1] }}
-                />
+                {!unlocked ? (
+                  <Lock className="h-3 w-3 shrink-0 text-game-text-muted" />
+                ) : (
+                  <span
+                    className="h-2.5 w-2.5 shrink-0 rounded-full border border-black/20"
+                    style={{ backgroundColor: t.previewColors[1] }}
+                  />
+                )}
                 <span className="hidden md:inline">{t.name}</span>
               </button>
             );
@@ -84,22 +159,33 @@ export function ThemePicker({
         </div>
       </div>
 
+      {lockedNotice && (
+        <div className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs font-semibold text-amber-500 animate-in fade-in slide-in-from-top-1">
+          🔒 {lockedNotice}
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
         {THEMES.map((theme) => {
           const isActive = theme.id === currentTheme;
+          const unlocked = isThemeUnlocked(theme, stats);
+
           return (
             <button
               key={theme.id}
               type="button"
-              onClick={() => onSelectTheme(theme.id)}
+              onClick={() => handleSelect(theme)}
               className={`group relative flex w-full min-w-0 flex-col items-start rounded-xl border-2 p-3 text-left transition-all overflow-hidden ${
                 isActive
                   ? "border-game-accent bg-game-bg-subtle shadow-md scale-[1.01]"
-                  : "border-game-border bg-game-bg/70 hover:border-game-accent/50 hover:bg-game-bg-subtle"
+                  : unlocked
+                  ? "border-game-border bg-game-bg/70 hover:border-game-accent/50 hover:bg-game-bg-subtle"
+                  : "border-game-border/50 bg-game-bg/40 opacity-75 hover:opacity-100 hover:border-game-border"
               }`}
             >
               <div className="mb-1.5 flex w-full min-w-0 items-center justify-between gap-1.5">
-                <span className="truncate text-sm font-black text-game-text">
+                <span className="truncate text-sm font-black text-game-text flex items-center gap-1.5">
+                  {!unlocked && <Lock className="h-3.5 w-3.5 shrink-0 text-game-text-muted" />}
                   {theme.name}
                 </span>
 
@@ -113,14 +199,14 @@ export function ThemePicker({
                       />
                     ))}
                   </div>
-                  {isActive && (
-                    <Check className="h-3.5 w-3.5 text-game-accent shrink-0" />
-                  )}
+                  {isActive && <Check className="h-3.5 w-3.5 text-game-accent shrink-0" />}
                 </div>
               </div>
 
               <p className="w-full text-[11px] leading-snug text-game-text-muted break-words line-clamp-2">
-                {theme.description}
+                {!unlocked && theme.condition
+                  ? `🔒 ${theme.condition.description}`
+                  : theme.description}
               </p>
             </button>
           );

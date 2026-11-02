@@ -1,6 +1,6 @@
 "use client";
 
-import { GlobalRankingEntry, PlayerProfile, RankingEntry } from "@/types/game";
+import { GameMode, GlobalRankingEntry, PlayerProfile, RankingEntry } from "@/types/game";
 import {
   Trophy,
   RotateCcw,
@@ -9,9 +9,10 @@ import {
   Check,
   Globe,
   Smartphone,
-  ExternalLink,
+  Share2,
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
+import { ShareCardDialog } from "../share-card";
 
 interface GameOverSceneProps {
   score: number;
@@ -23,6 +24,7 @@ interface GameOverSceneProps {
   globalRanking: GlobalRankingEntry[];
   player: PlayerProfile | null;
   globalSynced: boolean;
+  mode?: GameMode;
   onSaveLocalRanking: (initials: string) => void;
   onLoginGithub: () => void;
   onPlayAgain: () => void;
@@ -39,6 +41,7 @@ export function GameOverScene({
   globalRanking,
   player,
   globalSynced,
+  mode = "classic",
   onSaveLocalRanking,
   onLoginGithub,
   onPlayAgain,
@@ -47,6 +50,7 @@ export function GameOverScene({
   const [initials, setInitials] = useState("");
   const [hasSavedLocal, setHasSavedLocal] = useState(false);
   const [previewTab, setPreviewTab] = useState<"global" | "local">("global");
+  const [isShareOpen, setIsShareOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -69,12 +73,18 @@ export function GameOverScene({
     return `${index + 1}º`;
   };
 
+  // Find if user is in top global ranking
+  const userRankIndex = player
+    ? globalRanking.findIndex((r) => r.githubId === player.githubId)
+    : -1;
+  const confirmedRank = userRankIndex >= 0 ? userRankIndex + 1 : undefined;
+
   return (
     <div className="flex w-full max-w-md flex-col items-center text-center animate-in fade-in zoom-in-95 duration-200">
       {/* Game Over Title */}
       <div className="mb-4">
         <span className="inline-block rounded-full border border-red-500/30 bg-red-500/10 px-3 py-1 text-xs font-black uppercase tracking-widest text-red-500">
-          Sem movimentos possíveis
+          Partida Concluída
         </span>
         <h1 className="mt-2 text-5xl font-black tracking-tight text-game-text sm:text-6xl">
           FIM DE JOGO
@@ -99,67 +109,24 @@ export function GameOverScene({
 
         <div className="flex flex-col items-center justify-center rounded-2xl border border-game-border bg-game-bg-subtle p-3.5 shadow-xs">
           <span className="text-[11px] font-black uppercase tracking-wider text-game-text-muted">
-            Maior Bloco Feito
+            Maior Peça
           </span>
-          <span className="text-2xl font-black text-game-text tabular-nums">
+          <span className="text-2xl font-black text-game-accent tabular-nums">
             {highestTile}
-          </span>
-          <span className="mt-1 text-[10px] font-bold text-game-text-muted">
-            Recorde: {bestScore.toLocaleString("pt-BR")}
           </span>
         </div>
       </div>
 
-      {/* Global Sync Status or GitHub Login Prompt */}
-      {player ? (
-        <div className="mb-4 flex w-full items-center justify-between rounded-xl border border-green-500/30 bg-green-500/10 p-3 text-xs font-bold text-green-700 dark:text-green-400">
-          <div className="flex items-center gap-2">
-            <img
-              src={player.avatarUrl}
-              alt={player.username}
-              className="h-6 w-6 rounded-full border border-green-500/40"
-            />
-            <span>
-              {globalSynced
-                ? "Pontuação enviada ao Ranking Global no Neon!"
-                : `Sincronizando pontuação de @${player.username}...`}
-            </span>
-          </div>
-          {globalSynced && <Check className="h-4 w-4 shrink-0 text-green-600" />}
-        </div>
-      ) : (
-        <div className="mb-4 flex w-full items-center justify-between gap-3 rounded-xl border border-game-border bg-game-bg-subtle p-3 text-left">
-          <div className="flex items-center gap-2.5">
-            <Globe className="h-5 w-5 text-game-accent shrink-0" />
-            <div>
-              <div className="text-xs font-black text-game-text">
-                Dispute o Ranking Global
-              </div>
-              <div className="text-[11px] text-game-text-muted">
-                Salve com seu avatar e nome do GitHub
-              </div>
-            </div>
-          </div>
-          <button
-            onClick={onLoginGithub}
-            className="shrink-0 rounded-lg bg-black px-3 py-1.5 text-xs font-bold text-white hover:bg-neutral-800"
-          >
-            Entrar
-          </button>
-        </div>
-      )}
-
-      {/* Local Ranking Initials Input */}
+      {/* Local Leaderboard Save Form (When Eligible) */}
       {isEligibleForLocalRanking && !hasSavedLocal && (
-        <div className="mb-4 w-full rounded-2xl border-2 border-game-accent bg-game-bg-subtle p-3.5 shadow-md animate-in slide-in-from-bottom-2 duration-200">
-          <div className="mb-1.5 flex items-center justify-center gap-1.5 text-xs font-black uppercase tracking-wider text-game-accent">
-            <Smartphone className="h-4 w-4" />
-            <span>Top 10 Local neste navegador!</span>
+        <div className="mb-4 w-full rounded-2xl border-2 border-game-accent/50 bg-game-bg-subtle p-4 shadow-sm animate-in fade-in slide-in-from-bottom-2">
+          <div className="mb-2 flex items-center justify-center gap-1.5 text-xs font-black uppercase tracking-wider text-game-accent">
+            <Trophy className="h-4 w-4" />
+            <span>Top 10 Local Atingido!</span>
           </div>
-          <p className="mb-2 text-xs text-game-text-muted">
-            Digite 3 iniciais para registrar localmente:
+          <p className="mb-3 text-xs text-game-text-muted">
+            Digite suas 3 iniciais para salvar seu recorde neste dispositivo:
           </p>
-
           <form
             onSubmit={handleSubmitInitials}
             className="flex items-center justify-center gap-2"
@@ -169,34 +136,53 @@ export function GameOverScene({
               type="text"
               maxLength={3}
               value={initials}
-              onChange={(e) =>
-                setInitials(
-                  e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "")
-                )
-              }
+              onChange={(e) => setInitials(e.target.value.toUpperCase())}
               placeholder="AAA"
-              className="w-20 rounded-xl border-2 border-game-border bg-game-bg p-2 text-center font-mono text-xl font-black tracking-widest text-game-text uppercase outline-hidden focus:border-game-accent"
+              className="h-10 w-24 rounded-xl border-2 border-game-border bg-game-bg px-2 text-center font-mono text-xl font-black uppercase tracking-widest text-game-text placeholder:text-game-text-muted/40 focus:border-game-accent focus:outline-hidden"
             />
             <button
               type="submit"
-              disabled={initials.length === 0}
-              className="rounded-xl bg-game-accent px-4 py-2.5 text-xs font-black uppercase tracking-wider text-game-accent-text hover:bg-game-accent-hover disabled:opacity-50"
+              disabled={!initials.trim()}
+              className="flex h-10 items-center justify-center gap-1.5 rounded-xl bg-game-accent px-4 text-xs font-black uppercase tracking-wider text-game-accent-text hover:bg-game-accent-hover disabled:opacity-50 transition-colors"
             >
-              Salvar
+              <span>Salvar</span>
             </button>
           </form>
         </div>
       )}
 
       {hasSavedLocal && (
-        <div className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl border border-green-500/30 bg-green-500/10 p-2 text-xs font-bold text-green-600">
-          <Check className="h-4 w-4" />
-          <span>Recorde local salvo!</span>
+        <div className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-2.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+          <Check className="h-4 w-4 shrink-0" />
+          <span>Recorde salvo no ranking local!</span>
         </div>
       )}
 
-      {/* Rankings Preview Tabs */}
-      <div className="mb-5 w-full rounded-2xl border border-game-border bg-game-bg-subtle p-3.5 text-left shadow-xs">
+      {/* Global Ranking Status Notification */}
+      {player && globalSynced && (
+        <div className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl border border-game-accent/30 bg-game-accent/10 p-2.5 text-xs font-bold text-game-text">
+          <Globe className="h-4 w-4 text-game-accent shrink-0" />
+          <span>Sincronizado no ranking mundial da Neon (@{player.username})</span>
+        </div>
+      )}
+
+      {!player && (
+        <div className="mb-4 flex w-full flex-col items-center gap-1.5 rounded-xl border border-game-border bg-game-bg-subtle p-3 text-xs">
+          <span className="text-game-text-muted">
+            Conecte-se com o GitHub para salvar sua pontuação no ranking mundial permanente!
+          </span>
+          <button
+            onClick={onLoginGithub}
+            className="mt-1 flex items-center gap-1.5 font-bold text-game-accent hover:underline"
+          >
+            <Globe className="h-3.5 w-3.5" />
+            <span>Entrar com GitHub</span>
+          </button>
+        </div>
+      )}
+
+      {/* Mini Ranking Preview */}
+      <div className="mb-4 w-full rounded-2xl border border-game-border bg-game-bg-subtle p-3.5 text-left shadow-xs">
         <div className="mb-2 flex items-center justify-between border-b border-game-border pb-2">
           <div className="flex gap-2">
             <button
@@ -287,6 +273,14 @@ export function GameOverScene({
       {/* Action Buttons */}
       <div className="flex w-full flex-col gap-2.5">
         <button
+          onClick={() => setIsShareOpen(true)}
+          className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-game-accent bg-game-bg-subtle py-3 px-6 text-sm font-black uppercase tracking-wider text-game-accent transition-all hover:bg-game-accent hover:text-game-accent-text"
+        >
+          <Share2 className="h-4 w-4" />
+          <span>Compartilhar Resultado</span>
+        </button>
+
+        <button
           onClick={onPlayAgain}
           className="flex w-full items-center justify-center gap-2.5 rounded-2xl bg-game-accent py-3.5 px-6 text-base font-black uppercase tracking-wider text-game-accent-text shadow-md transition-all hover:bg-game-accent-hover hover:scale-[1.01] active:scale-[0.99]"
         >
@@ -302,6 +296,17 @@ export function GameOverScene({
           <span>Menu Principal</span>
         </button>
       </div>
+
+      {/* Share Dialog */}
+      <ShareCardDialog
+        isOpen={isShareOpen}
+        onClose={() => setIsShareOpen(false)}
+        score={score}
+        highestTile={highestTile}
+        mode={mode}
+        confirmedRank={confirmedRank}
+        username={player?.username}
+      />
     </div>
   );
 }

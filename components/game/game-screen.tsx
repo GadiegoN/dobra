@@ -4,9 +4,12 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Board,
   Direction,
+  FriendChallenge,
+  GameMode,
   GameScene,
   GameTheme,
   GlobalRankingEntry,
+  MatchHistoryItem,
   PlayerProfile,
   RankingEntry,
 } from "@/types/game";
@@ -16,6 +19,8 @@ import {
   moveBoard,
   canMove,
   getHighestTile,
+  addRandomTile,
+  createRng,
 } from "@/lib/game-engine";
 import {
   getStoredRanking,
@@ -27,16 +32,20 @@ import {
   saveStoredTheme,
   isScoreEligibleForRanking,
 } from "@/lib/storage";
+import { saveLocalMatch } from "@/lib/stats";
+import { getDailyConfig, getDailyDate } from "@/lib/daily";
 import { MenuScene } from "./scenes/menu-scene";
 import { PlayScene } from "./scenes/play-scene";
 import { GameOverScene } from "./scenes/game-over-scene";
 import { RankingDialog } from "./ranking-dialog";
+import { StatsDialog } from "./scenes/stats-dialog";
 import { WinDialog } from "./scenes/win-dialog";
 import { soundManager } from "@/lib/audio";
 
 export default function GameScreen() {
   const [scene, setScene] = useState<GameScene>("menu");
   const [theme, setTheme] = useState<GameTheme>("classic");
+  const [mode, setMode] = useState<GameMode>("classic");
   const [board, setBoard] = useState<Board>(emptyBoard);
   const [score, setScore] = useState<number>(0);
   const [bestScore, setBestScore] = useState<number>(0);
@@ -45,6 +54,7 @@ export default function GameScreen() {
   const [globalRanking, setGlobalRanking] = useState<GlobalRankingEntry[]>([]);
   const [isLoadingGlobal, setIsLoadingGlobal] = useState(false);
   const [isRankingOpen, setIsRankingOpen] = useState(false);
+  const [isStatsOpen, setIsStatsOpen] = useState(false);
   const [hasGameInProgress, setHasGameInProgress] = useState(false);
   const [isNewBest, setIsNewBest] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -54,16 +64,31 @@ export default function GameScreen() {
   const [isWinDialogOpen, setIsWinDialogOpen] = useState<boolean>(false);
   const [hasAcknowledgedWin, setHasAcknowledgedWin] = useState<boolean>(false);
 
-  // Security & anti-cheat session state
+  // Daily Challenge & Friend Challenge state
+  const [isDailyChallengeActive, setIsDailyChallengeActive] = useState(false);
+  const [dailyPlayed, setDailyPlayed] = useState(false);
+  const [friendChallenge, setFriendChallenge] = useState<FriendChallenge | null>(null);
+
+  // Mode rules state
+  const [remainingSeconds, setRemainingSeconds] = useState<number>(60);
+  const [remainingMoves, setRemainingMoves] = useState<number>(80);
+  const [survivalCountdown, setSurvivalCountdown] = useState<number>(3);
+
+  // Security, tracking and replay history
   const [movesCount, setMovesCount] = useState<number>(0);
+  const movesLogRef = useRef<Direction[]>([]);
+  const gameSeedRef = useRef<number>(Date.now());
+  const gameStartTimeRef = useRef<number>(Date.now());
   const gameSessionTokenRef = useRef<string | null>(null);
 
-  // Synchronous game refs to prevent React StrictMode double-execution and input lag
+  // Synchronous game refs
   const boardRef = useRef<Board>(board);
   const scoreRef = useRef<number>(score);
   const bestScoreRef = useRef<number>(bestScore);
   const movesCountRef = useRef<number>(movesCount);
   const hasWonRef = useRef<boolean>(hasAcknowledgedWin);
+  const sceneRef = useRef<GameScene>(scene);
+  const modeRef = useRef<GameMode>(mode);
 
   useEffect(() => {
     boardRef.current = board;
@@ -84,6 +109,14 @@ export default function GameScreen() {
   useEffect(() => {
     hasWonRef.current = hasAcknowledgedWin;
   }, [hasAcknowledgedWin]);
+
+  useEffect(() => {
+    sceneRef.current = scene;
+  }, [scene]);
+
+  useEffect(() => {
+    modeRef.current = mode;
+  }, [mode]);
 
   // Fetch global ranking from Neon
   const fetchGlobalRanking = useCallback(async () => {
@@ -114,6 +147,19 @@ export default function GameScreen() {
     }
   }, []);
 
+  // Check Daily challenge status
+  const checkDailyStatus = useCallback(async () => {
+    try {
+      const res = await fetch("/api/daily");
+      if (res.ok) {
+        const data = await res.json();
+        setDailyPlayed(Boolean(data.hasPlayed));
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
   // Request new signed game session token from server
   const requestGameSession = useCallback(async () => {
     try {
@@ -121,11 +167,48 @@ export default function GameScreen() {
       if (res.ok) {
         const data = await res.json();
         gameSessionTokenRef.current = data.token || null;
+        if (data.seed && !isDailyChallengeActive && !friendChallenge) {
+          gameSeedRef.current = data.seed;
+        }
       }
     } catch (err) {
       console.error("Failed to request game session", err);
     }
-  }, []);
+  }, [isDailyChallengeActive, friendChallenge]);
+
+  // Save match to persistent history (Local + Neon DB)
+  const recordMatchOutcome = useCallback(
+    async (completed: boolean, won: boolean) => {
+      const durationSeconds = Math.max(
+        1,
+        Math.round((Date.now() - gameStartTimeRef.current) / 1000)
+      );
+      const matchItem: MatchHistoryItem = {
+        id: "m_" + Date.now(),
+        date: new Date().toISOString(),
+        mode: modeRef.current,
+        score: scoreRef.current,
+        highestTile: getHighestTile(boardRef.current),
+        movesCount: movesCountRef.current,
+        durationSeconds,
+        completed,
+        won,
+      };
+
+      // 1. Local storage
+      saveLocalMatch(matchItem);
+
+      // 2. Server database if authenticated
+      if (player) {
+        fetch("/api/stats", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(matchItem),
+        }).catch(() => {});
+      }
+    },
+    [player]
+  );
 
   // Sync score to Neon Global Leaderboard with anti-cheat payload
   const syncScoreToGlobal = useCallback(
@@ -139,21 +222,113 @@ export default function GameScreen() {
             score: finalScore,
             highestTile: highest,
             movesCount: totalMoves,
+            moves: movesLogRef.current,
             gameToken: gameSessionTokenRef.current,
           }),
         });
         if (res.ok) {
           setGlobalSynced(true);
           fetchGlobalRanking();
-        } else {
-          const errData = await res.json();
-          console.warn("Global sync rejected by server:", errData.error);
         }
+
+        // Also record to current season
+        fetch("/api/seasons", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ score: finalScore, highestTile: highest }),
+        }).catch(() => {});
       } catch (err) {
         console.error("Failed to sync score to global", err);
       }
     },
     [player, fetchGlobalRanking]
+  );
+
+  // Submit daily challenge
+  const submitDailyResult = useCallback(async () => {
+    if (!isDailyChallengeActive || !player) return;
+    try {
+      const durationSeconds = Math.max(
+        1,
+        Math.round((Date.now() - gameStartTimeRef.current) / 1000)
+      );
+      await fetch("/api/daily", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: getDailyDate(),
+          moves: movesLogRef.current,
+          durationSeconds,
+        }),
+      });
+      setDailyPlayed(true);
+    } catch (err) {
+      console.error("Error submitting daily challenge:", err);
+    }
+  }, [isDailyChallengeActive, player]);
+
+  // Submit friend challenge attempt
+  const submitFriendChallengeAttempt = useCallback(async () => {
+    if (!friendChallenge) return;
+    try {
+      await fetch(`/api/challenges/${friendChallenge.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          score: scoreRef.current,
+          highestTile: getHighestTile(boardRef.current),
+          movesCount: movesCountRef.current,
+        }),
+      });
+    } catch (err) {
+      console.error("Error submitting friend challenge attempt:", err);
+    }
+  }, [friendChallenge]);
+
+  // End Game handler
+  const triggerGameOver = useCallback(
+    (won: boolean = false) => {
+      if (sceneRef.current !== "play") return;
+      soundManager.playGameOver();
+      setHasGameInProgress(false);
+
+      const finalScore = scoreRef.current;
+      const highest = getHighestTile(boardRef.current);
+      const totalMoves = movesCountRef.current;
+
+      recordMatchOutcome(true, won);
+
+      if (isDailyChallengeActive) {
+        submitDailyResult();
+      } else if (friendChallenge) {
+        submitFriendChallengeAttempt();
+      }
+      
+      if (modeRef.current === "classic") {
+        syncScoreToGlobal(finalScore, highest, totalMoves);
+      }
+
+      // Record any legitimate game mode score to current weekly season
+      if (player && finalScore > 0) {
+        fetch("/api/seasons", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ score: finalScore, highestTile: highest }),
+        }).catch(() => {});
+      }
+
+      setTimeout(() => {
+        setScene("gameover");
+      }, 400);
+    },
+    [
+      recordMatchOutcome,
+      isDailyChallengeActive,
+      submitDailyResult,
+      friendChallenge,
+      submitFriendChallengeAttempt,
+      syncScoreToGlobal,
+    ]
   );
 
   // Initialize client state
@@ -169,8 +344,71 @@ export default function GameScreen() {
 
     fetchPlayerSession();
     fetchGlobalRanking();
+    checkDailyStatus();
+
+    // Check if challenge parameter in URL (?challenge=ch_xxx)
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      const challengeId = urlParams.get("challenge");
+      if (challengeId) {
+        fetch(`/api/challenges/${challengeId}`)
+          .then((res) => res.json())
+          .then((data) => {
+            if (data?.challenge) {
+              setFriendChallenge(data.challenge);
+              setMode(data.challenge.mode);
+            }
+          })
+          .catch(() => {});
+      }
+    }
+
     setMounted(true);
-  }, [fetchPlayerSession, fetchGlobalRanking]);
+  }, [fetchPlayerSession, fetchGlobalRanking, checkDailyStatus]);
+
+  // Mode: Time Rush countdown interval
+  useEffect(() => {
+    if (scene !== "play" || mode !== "time-rush") return;
+
+    const timer = setInterval(() => {
+      setRemainingSeconds((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          triggerGameOver(false);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [scene, mode, triggerGameOver]);
+
+  // Mode: Survival automatic tile spawn interval
+  useEffect(() => {
+    if (scene !== "play" || mode !== "survival") return;
+
+    const interval = setInterval(() => {
+      setSurvivalCountdown((prev) => {
+        if (prev <= 1) {
+          // Spawn extra random tile
+          const currentBoard = boardRef.current;
+          const res = addRandomTile(currentBoard);
+          if (res.added) {
+            boardRef.current = res.board;
+            setBoard(res.board);
+            if (!canMove(res.board)) {
+              triggerGameOver(false);
+            }
+          }
+          return 3;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [scene, mode, triggerGameOver]);
 
   const handleToggleSound = () => {
     const nextState = soundManager.toggle();
@@ -182,8 +420,15 @@ export default function GameScreen() {
     saveStoredTheme(newTheme);
   };
 
-  const handleStartNewGame = async () => {
-    const initialBoard = newGame();
+  const handleStartNewGame = async (overrideSeed?: number) => {
+    const seed = overrideSeed ?? ((Math.floor(Math.random() * 2147483647) >>> 0) || 1);
+    gameSeedRef.current = seed;
+    gameStartTimeRef.current = Date.now();
+    movesLogRef.current = [];
+
+    const rng = createRng(seed);
+    const initialBoard = newGame(rng);
+
     boardRef.current = initialBoard;
     scoreRef.current = 0;
     movesCountRef.current = 0;
@@ -193,6 +438,9 @@ export default function GameScreen() {
     setScore(0);
     setLastGained(0);
     setMovesCount(0);
+    setRemainingSeconds(60);
+    setRemainingMoves(80);
+    setSurvivalCountdown(3);
     setIsNewBest(false);
     setGlobalSynced(false);
     setIsWinDialogOpen(false);
@@ -200,13 +448,20 @@ export default function GameScreen() {
     setHasGameInProgress(true);
     setScene("play");
 
-    // Request fresh signed game session token
     await requestGameSession();
+  };
+
+  const handleStartDailyChallenge = () => {
+    const config = getDailyConfig();
+    setIsDailyChallengeActive(true);
+    setMode("classic");
+    handleStartNewGame(config.seed);
   };
 
   const handleContinueOrPlay = () => {
     if (!hasGameInProgress) {
-      handleStartNewGame();
+      setIsDailyChallengeActive(false);
+      handleStartNewGame(friendChallenge?.seed);
     } else {
       setScene("play");
     }
@@ -220,7 +475,10 @@ export default function GameScreen() {
       const result = moveBoard(currentBoard, direction);
       if (!result.changed) return;
 
-      // 1. Update Board synchronously in ref and reactively in state
+      // Track moves log for deterministic replay validation
+      movesLogRef.current.push(direction);
+
+      // 1. Update Board
       boardRef.current = result.board;
       setBoard(result.board);
 
@@ -230,7 +488,17 @@ export default function GameScreen() {
       setMovesCount(nextMoves);
       setLastGained(result.gained);
 
-      // 3. Audio Feedback (executed strictly once per move)
+      // Mode: Move-limit countdown
+      if (modeRef.current === "move-limit") {
+        const remaining = 80 - nextMoves;
+        setRemainingMoves(Math.max(0, remaining));
+        if (remaining <= 0) {
+          triggerGameOver(false);
+          return;
+        }
+      }
+
+      // 3. Audio Feedback
       if (result.gained > 0) {
         const merged = Math.min(2048, result.gained);
         soundManager.playMerge(merged);
@@ -238,7 +506,7 @@ export default function GameScreen() {
         soundManager.playMove();
       }
 
-      // 4. Update Score (strictly single addition, no StrictMode double-execution)
+      // 4. Update Score
       const newScore = scoreRef.current + result.gained;
       scoreRef.current = newScore;
       setScore(newScore);
@@ -251,8 +519,16 @@ export default function GameScreen() {
         saveBestScore(newScore);
       }
 
-      // 6. Win check (2048 reached for the first time)
       const currentHighest = getHighestTile(result.board);
+
+      // Mode: Target win condition
+      if (modeRef.current === "target" && currentHighest >= 1024) {
+        soundManager.playWin();
+        triggerGameOver(true);
+        return;
+      }
+
+      // 6. Win check (2048 reached in classic/other modes)
       if (currentHighest >= 2048 && !hasWonRef.current) {
         hasWonRef.current = true;
         setHasAcknowledgedWin(true);
@@ -262,16 +538,10 @@ export default function GameScreen() {
 
       // 7. Game Over check
       if (!canMove(result.board)) {
-        soundManager.playGameOver();
-        setHasGameInProgress(false);
-        syncScoreToGlobal(newScore, currentHighest, nextMoves);
-
-        setTimeout(() => {
-          setScene("gameover");
-        }, 400);
+        triggerGameOver(false);
       }
     },
-    [scene, syncScoreToGlobal]
+    [scene, triggerGameOver]
   );
 
   const handleSaveLocalRanking = (initials: string) => {
@@ -305,9 +575,9 @@ export default function GameScreen() {
     return (
       <div className="flex min-h-screen w-full items-center justify-center bg-[#faf8ef] p-4 text-[#776e65]">
         <div className="text-center font-black">
-          <div className="text-4xl">2048</div>
+          <div className="text-4xl">DOBRA</div>
           <div className="mt-2 text-xs font-semibold opacity-70">
-            Carregando jogo...
+            Carregando...
           </div>
         </div>
       </div>
@@ -324,9 +594,18 @@ export default function GameScreen() {
           <MenuScene
             bestScore={bestScore}
             hasGameInProgress={hasGameInProgress}
+            selectedMode={mode}
+            onSelectMode={(m) => setMode(m)}
             onPlay={handleContinueOrPlay}
-            onNewGame={handleStartNewGame}
+            onNewGame={() => {
+              setIsDailyChallengeActive(false);
+              handleStartNewGame();
+            }}
             onOpenRanking={() => setIsRankingOpen(true)}
+            onOpenStats={() => setIsStatsOpen(true)}
+            onStartDailyChallenge={handleStartDailyChallenge}
+            dailyPlayed={dailyPlayed}
+            friendChallenge={friendChallenge}
             localRankingCount={localRanking.length}
             globalRankingCount={globalRanking.length}
             currentTheme={theme}
@@ -347,11 +626,21 @@ export default function GameScreen() {
             lastGained={lastGained}
             currentTheme={theme}
             player={player}
+            mode={mode}
+            movesCount={movesCount}
+            remainingSeconds={remainingSeconds}
+            remainingMoves={remainingMoves}
+            survivalSecondsToNext={survivalCountdown}
+            targetTile={1024}
+            highestTile={highestTile}
             soundEnabled={soundEnabled}
             onToggleSound={handleToggleSound}
             onMove={handleMove}
-            onRestart={handleStartNewGame}
-            onBackToMenu={() => setScene("menu")}
+            onRestart={() => handleStartNewGame(gameSeedRef.current)}
+            onBackToMenu={() => {
+              recordMatchOutcome(false, false);
+              setScene("menu");
+            }}
             onSelectTheme={handleSelectTheme}
           />
         )}
@@ -367,15 +656,16 @@ export default function GameScreen() {
             globalRanking={globalRanking}
             player={player}
             globalSynced={globalSynced}
+            mode={mode}
             onSaveLocalRanking={handleSaveLocalRanking}
             onLoginGithub={handleLoginGithub}
-            onPlayAgain={handleStartNewGame}
+            onPlayAgain={() => handleStartNewGame()}
             onGoToMenu={() => setScene("menu")}
           />
         )}
       </main>
 
-      {/* Global & Local Ranking Dialog */}
+      {/* Global & Local Ranking Dialog with Seasons Tab */}
       <RankingDialog
         isOpen={isRankingOpen}
         onClose={() => setIsRankingOpen(false)}
@@ -386,6 +676,13 @@ export default function GameScreen() {
         onClearLocalRanking={handleClearLocalRanking}
         player={player}
         onLoginGithub={handleLoginGithub}
+      />
+
+      {/* Personal Player Stats Dialog */}
+      <StatsDialog
+        isOpen={isStatsOpen}
+        onClose={() => setIsStatsOpen(false)}
+        player={player}
       />
 
       {/* 2048 Victory Celebration Dialog */}

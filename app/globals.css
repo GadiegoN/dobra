@@ -303,6 +303,90 @@
     --tile-super-text: #ffffff;
 }
 
+/* 5. SUNSET / GOLDEN HOUR */
+[data-game-theme="sunset"] {
+    --game-bg: #2b1329;
+    --game-bg-subtle: #3d1b3a;
+    --game-text: #ffd5ab;
+    --game-text-muted: #ff9e7d;
+    --game-board: #431b3e;
+    --game-cell-empty: rgba(255, 140, 105, 0.15);
+    --game-accent: #ff6b6b;
+    --game-accent-hover: #e04f5f;
+    --game-accent-text: #ffffff;
+    --game-card-bg: #4d2347;
+    --game-card-text: #ffd5ab;
+    --game-card-label: #ff9e7d;
+    --game-border: #ff6b6b66;
+
+    --tile-2-bg: #4a2245;
+    --tile-2-text: #ffd5ab;
+    --tile-4-bg: #5f2452;
+    --tile-4-text: #ffd5ab;
+    --tile-8-bg: #80285a;
+    --tile-8-text: #ffffff;
+    --tile-16-bg: #a6325e;
+    --tile-16-text: #ffffff;
+    --tile-32-bg: #ce3e58;
+    --tile-32-text: #ffffff;
+    --tile-64-bg: #f2574e;
+    --tile-64-text: #ffffff;
+    --tile-128-bg: #ff7644;
+    --tile-128-text: #ffffff;
+    --tile-256-bg: #ff9738;
+    --tile-256-text: #ffffff;
+    --tile-512-bg: #ffb830;
+    --tile-512-text: #2b1329;
+    --tile-1024-bg: #ffd13b;
+    --tile-1024-text: #2b1329;
+    --tile-2048-bg: #ffe46b;
+    --tile-2048-text: #2b1329;
+    --tile-super-bg: #ff3366;
+    --tile-super-text: #ffffff;
+}
+
+/* 6. EMERALD / JADE FOREST */
+[data-game-theme="emerald"] {
+    --game-bg: #062319;
+    --game-bg-subtle: #0a3526;
+    --game-text: #d1fae5;
+    --game-text-muted: #6ee7b7;
+    --game-board: #0d4230;
+    --game-cell-empty: rgba(16, 185, 129, 0.15);
+    --game-accent: #10b981;
+    --game-accent-hover: #059669;
+    --game-accent-text: #ffffff;
+    --game-card-bg: #11503b;
+    --game-card-text: #d1fae5;
+    --game-card-label: #6ee7b7;
+    --game-border: #10b98166;
+
+    --tile-2-bg: #134e3a;
+    --tile-2-text: #a7f3d0;
+    --tile-4-bg: #166548;
+    --tile-4-text: #d1fae5;
+    --tile-8-bg: #0d7c55;
+    --tile-8-text: #ffffff;
+    --tile-16-bg: #059669;
+    --tile-16-text: #ffffff;
+    --tile-32-bg: #10b981;
+    --tile-32-text: #062319;
+    --tile-64-bg: #34d399;
+    --tile-64-text: #062319;
+    --tile-128-bg: #6ee7b7;
+    --tile-128-text: #062319;
+    --tile-256-bg: #2dd4bf;
+    --tile-256-text: #062319;
+    --tile-512-bg: #14b8a6;
+    --tile-512-text: #ffffff;
+    --tile-1024-bg: #0d9488;
+    --tile-1024-text: #ffffff;
+    --tile-2048-bg: #0f766e;
+    --tile-2048-text: #ffffff;
+    --tile-super-bg: #fbbf24;
+    --tile-super-text: #062319;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

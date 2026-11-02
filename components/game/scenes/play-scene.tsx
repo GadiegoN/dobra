@@ -1,9 +1,18 @@
 "use client";
 
-import { Board, Direction, GameTheme, PlayerProfile } from "@/types/game";
+import { Board, Direction, GameMode, GameTheme, PlayerProfile } from "@/types/game";
 import { BoardTile } from "../board-tile";
 import { ThemePicker } from "../theme-picker";
-import { ArrowLeft, RotateCcw, Volume2, VolumeX } from "lucide-react";
+import {
+  ArrowLeft,
+  RotateCcw,
+  Volume2,
+  VolumeX,
+  Timer,
+  Footprints,
+  Target,
+  ShieldAlert,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 interface PlaySceneProps {
@@ -13,6 +22,13 @@ interface PlaySceneProps {
   lastGained: number;
   currentTheme: GameTheme;
   player: PlayerProfile | null;
+  mode?: GameMode;
+  movesCount?: number;
+  remainingSeconds?: number;
+  remainingMoves?: number;
+  survivalSecondsToNext?: number;
+  targetTile?: number;
+  highestTile?: number;
   soundEnabled: boolean;
   onToggleSound: () => void;
   onMove: (dir: Direction) => void;
@@ -28,6 +44,13 @@ export function PlayScene({
   lastGained,
   currentTheme,
   player,
+  mode = "classic",
+  movesCount = 0,
+  remainingSeconds,
+  remainingMoves,
+  survivalSecondsToNext,
+  targetTile = 2048,
+  highestTile = 2,
   soundEnabled,
   onToggleSound,
   onMove,
@@ -122,7 +145,7 @@ export function PlayScene({
   return (
     <div className="flex w-full max-w-[480px] flex-col items-center animate-in fade-in duration-150">
       {/* Top Bar / Navigation */}
-      <div className="mb-4 flex w-full items-center justify-between">
+      <div className="mb-3 flex w-full items-center justify-between">
         <button
           onClick={onBackToMenu}
           className="flex items-center gap-1.5 rounded-xl border border-game-border bg-game-bg-subtle px-3 py-2 text-xs font-black uppercase tracking-wider text-game-text hover:bg-game-border/40 transition-colors"
@@ -163,13 +186,72 @@ export function PlayScene({
         </div>
       </div>
 
+      {/* Mode Specific Objective Banner */}
+      {mode !== "classic" && (
+        <div className="mb-3 flex w-full items-center justify-between rounded-xl border border-game-border bg-game-bg-subtle px-3 py-2 text-xs font-bold shadow-xs">
+          {mode === "time-rush" && (
+            <div className="flex items-center gap-2 text-rose-500">
+              <Timer className="h-4 w-4 animate-pulse" />
+              <span>Tempo Restante:</span>
+              <span className="font-mono text-sm font-black tabular-nums">
+                {remainingSeconds !== undefined ? `${remainingSeconds}s` : "60s"}
+              </span>
+            </div>
+          )}
+
+          {mode === "move-limit" && (
+            <div className="flex items-center gap-2 text-amber-500">
+              <Footprints className="h-4 w-4" />
+              <span>Movimentos Restantes:</span>
+              <span className="font-mono text-sm font-black tabular-nums">
+                {remainingMoves !== undefined ? remainingMoves : 80}
+              </span>
+            </div>
+          )}
+
+          {mode === "survival" && (
+            <div className="flex items-center gap-2 text-indigo-400">
+              <ShieldAlert className="h-4 w-4 animate-bounce" />
+              <span>Sobrevivência:</span>
+              <span className="text-[11px] text-game-text-muted">
+                Nova peça em: {survivalSecondsToNext !== undefined ? `${survivalSecondsToNext}s` : "3s"}
+              </span>
+            </div>
+          )}
+
+          {mode === "target" && (
+            <div className="flex items-center gap-2 text-emerald-500">
+              <Target className="h-4 w-4" />
+              <span>Objetivo: Bloco {targetTile}</span>
+              <span className="text-[10px] text-game-text-muted font-normal">
+                (Atual: {highestTile})
+              </span>
+            </div>
+          )}
+
+          <div className="text-[11px] font-mono text-game-text-muted">
+            {movesCount} mov
+          </div>
+        </div>
+      )}
+
       {/* Game HUD Header */}
-      <div className="mb-4 flex w-full items-center justify-between gap-4">
+      <div className="mb-3 flex w-full items-center justify-between gap-4">
         <div>
           <h1 className="text-4xl font-black tracking-tight text-game-text sm:text-5xl">
-            2048
+            DOBRA
           </h1>
-          <p className="text-xs font-semibold text-game-text-muted">Dobre e combine</p>
+          <p className="text-xs font-semibold text-game-text-muted">
+            {mode === "classic"
+              ? "Modo Clássico"
+              : mode === "time-rush"
+              ? "Contra o Relógio"
+              : mode === "move-limit"
+              ? "Movimentos Limitados"
+              : mode === "survival"
+              ? "Modo Sobrevivência"
+              : "Modo Alvo"}
+          </p>
         </div>
 
         <div className="flex gap-2">
@@ -206,7 +288,7 @@ export function PlayScene({
         <span className="sm:hidden">Deslize para mover</span>
         <button
           onClick={onRestart}
-          className="flex items-center gap-1 rounded-lg border border-game-border bg-game-bg-subtle px-2.5 py-1 font-bold text-game-text hover:bg-game-border/30"
+          className="flex items-center gap-1 rounded-lg border border-game-border bg-game-bg-subtle px-2.5 py-1 font-bold text-game-text hover:bg-game-border/30 transition-colors"
         >
           <RotateCcw className="h-3.5 w-3.5" />
           <span>Reiniciar</span>
@@ -235,7 +317,7 @@ export function PlayScene({
       </div>
 
       <div className="mt-4 text-center text-xs text-game-text-muted">
-        Dica: mantenha o seu maior número em um dos cantos do tabuleiro.
+        Dica: mantenha seu maior número em um dos cantos do tabuleiro.
       </div>
     </div>
   );
