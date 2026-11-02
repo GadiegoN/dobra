@@ -6,7 +6,8 @@ import {
   verifyGameSessionToken,
   verifyGameReplay,
 } from "@/lib/security";
-import { Direction } from "@/types/game";
+import { signProfileToken, verifyProfileToken } from "@/lib/auth";
+import { Direction, PlayerProfile } from "@/types/game";
 import { replayGame } from "@/lib/game-engine";
 
 describe("Security & Anti-Cheat Validation", () => {
@@ -113,6 +114,46 @@ describe("Security & Anti-Cheat Validation", () => {
         "classic"
       );
       expect(checkTampered.valid).toBe(false);
+    });
+  });
+
+  describe("HMAC Session Cookie Security", () => {
+    const mockProfile: PlayerProfile = {
+      githubId: "12345678",
+      username: "testplayer",
+      displayName: "Test Player",
+      avatarUrl: "https://github.com/testplayer.png",
+      githubProfileUrl: "https://github.com/testplayer",
+    };
+
+    it("signs and verifies valid player profile session cookies", () => {
+      const signed = signProfileToken(mockProfile);
+      const verified = verifyProfileToken(signed);
+
+      expect(verified).not.toBeNull();
+      expect(verified?.githubId).toBe("12345678");
+      expect(verified?.username).toBe("testplayer");
+    });
+
+    it("rejects forged or tampered session tokens", () => {
+      const signed = signProfileToken(mockProfile);
+      const parts = signed.split(".");
+      // Tamper with payload (e.g. change githubId)
+      const fakePayload = Buffer.from(
+        JSON.stringify({ ...mockProfile, githubId: "99999999" })
+      ).toString("base64url");
+      const forged = `${fakePayload}.${parts[1]}`;
+
+      const verified = verifyProfileToken(forged);
+      expect(verified).toBeNull();
+    });
+
+    it("gracefully falls back to valid legacy base64 cookies", () => {
+      const legacy = Buffer.from(JSON.stringify(mockProfile)).toString("base64");
+      const verified = verifyProfileToken(legacy);
+
+      expect(verified).not.toBeNull();
+      expect(verified?.githubId).toBe("12345678");
     });
   });
 });
