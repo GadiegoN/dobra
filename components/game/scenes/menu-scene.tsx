@@ -55,6 +55,8 @@ interface MenuSceneProps {
   onLogoutGithub: () => void;
   soundEnabled: boolean;
   onToggleSound: () => void;
+  isInIframe?: boolean;
+  onOpenIframeNotice?: () => void;
 }
 
 const MODES: Array<{ id: GameMode; name: string; icon: typeof Play; desc: string }> = [
@@ -88,6 +90,8 @@ export function MenuScene({
   onLogoutGithub,
   soundEnabled,
   onToggleSound,
+  isInIframe = false,
+  onOpenIframeNotice,
 }: MenuSceneProps) {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
 
@@ -187,6 +191,24 @@ export function MenuScene({
           </a>
         </div>
       </div>
+
+      {/* Embedded Iframe Sandbox Notice Banner */}
+      {isInIframe && (
+        <div
+          onClick={onOpenIframeNotice}
+          className="mb-4 flex w-full cursor-pointer items-center justify-between rounded-2xl border border-amber-500/35 bg-amber-500/10 p-2.5 text-left text-xs text-amber-200 shadow-2xs transition-all hover:bg-amber-500/15 hover:border-amber-500/50"
+        >
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="h-4 w-4 text-amber-400 shrink-0" />
+            <span className="text-[11px] font-bold text-amber-300">
+              Modo Prévia (Sandbox) • Login e Rankings no navegador
+            </span>
+          </div>
+          <span className="text-[10px] font-black uppercase text-amber-400 underline shrink-0 ml-2">
+            Saiba mais
+          </span>
+        </div>
+      )}
 
       {/* Arcade Title Badge */}
       <div className="mb-4 flex flex-col items-center">

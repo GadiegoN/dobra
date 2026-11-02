@@ -50,6 +50,7 @@ import { RankingDialog } from "./ranking-dialog";
 import { StatsDialog } from "./scenes/stats-dialog";
 import { DailyCalendarDialog } from "./scenes/daily-calendar-dialog";
 import { WinDialog } from "./scenes/win-dialog";
+import { IframeNoticeDialog } from "./scenes/iframe-notice-dialog";
 import { soundManager } from "@/lib/audio";
 import { ExternalLink } from "lucide-react";
 import { initClientAuthFetch, setClientAuthToken } from "@/lib/client-auth";
@@ -84,6 +85,7 @@ export default function GameScreen() {
   const [dailyPlayed, setDailyPlayed] = useState(false);
   const [streakInfo, setStreakInfo] = useState<StreakInfo | null>(null);
   const [isInIframe, setIsInIframe] = useState(false);
+  const [isIframeNoticeOpen, setIsIframeNoticeOpen] = useState(false);
   const [friendChallenge, setFriendChallenge] = useState<FriendChallenge | null>(null);
 
   // Mode rules state
@@ -635,6 +637,12 @@ export default function GameScreen() {
   };
 
   const handleLoginGithub = () => {
+    // If inside a sandboxed iframe, popup is blocked; inform player via dialog
+    if (isInIframe) {
+      setIsIframeNoticeOpen(true);
+      return;
+    }
+
     // Open in popup to avoid iframe X-Frame-Options: DENY restriction from GitHub
     const width = 580;
     const height = 700;
@@ -730,6 +738,8 @@ export default function GameScreen() {
             onLogoutGithub={handleLogoutGithub}
             soundEnabled={soundEnabled}
             onToggleSound={handleToggleSound}
+            isInIframe={isInIframe}
+            onOpenIframeNotice={() => setIsIframeNoticeOpen(true)}
           />
         )}
 
@@ -820,6 +830,12 @@ export default function GameScreen() {
           setIsWinDialogOpen(false);
           setIsRankingOpen(true);
         }}
+      />
+
+      {/* Iframe Sandbox Explanatory Notice Dialog */}
+      <IframeNoticeDialog
+        isOpen={isIframeNoticeOpen}
+        onClose={() => setIsIframeNoticeOpen(false)}
       />
     </div>
   );
