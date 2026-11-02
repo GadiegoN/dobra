@@ -22,6 +22,7 @@ import {
   dateStringToDays,
   daysToDateString,
 } from "@/lib/daily";
+import { getLocalHistory } from "@/lib/stats";
 
 interface DailyCalendarDialogProps {
   isOpen: boolean;
@@ -73,6 +74,14 @@ const FLAME_TIER_STYLES: Record<
 
 const DAY_LABELS = ["D", "S", "T", "Q", "Q", "S", "S"];
 
+const HEATMAP_LEVEL_STYLES: Record<number, string> = {
+  0: "bg-game-border/40 hover:bg-game-border/70",
+  1: "bg-purple-900/50 border border-purple-500/30 hover:bg-purple-800/70",
+  2: "bg-purple-700/80 hover:bg-purple-600 shadow-2xs",
+  3: "bg-purple-600 hover:bg-purple-500 shadow-xs",
+  4: "bg-purple-500 hover:bg-purple-400 shadow-[0_0_8px_rgba(168,85,247,0.6)] ring-1 ring-purple-300",
+};
+
 export function DailyCalendarDialog({
   isOpen,
   onClose,
@@ -87,6 +96,7 @@ export function DailyCalendarDialog({
   const [showRanking, setShowRanking] = useState(false);
   const [streakFreeze, setStreakFreeze] = useState(false);
   const [serverStreak, setServerStreak] = useState<StreakInfo | null>(null);
+  const [matchCounts, setMatchCounts] = useState<Record<string, number>>({});
 
   const todayStr = getDailyDate();
 
@@ -105,6 +115,17 @@ export function DailyCalendarDialog({
       map[item.date] = item;
     }
     setHistoryMap({ ...map });
+
+    // Aggregate all local matches for gradual heatmap levels
+    const counts: Record<string, number> = {};
+    const localMatches = getLocalHistory();
+    for (const m of localMatches) {
+      if (m.date) {
+        const dStr = getDailyDate(new Date(m.date));
+        counts[dStr] = (counts[dStr] || 0) + 1;
+      }
+    }
+    setMatchCounts({ ...counts });
 
     // 2. Fetch server history if authenticated
     setIsLoading(true);
@@ -135,6 +156,28 @@ export function DailyCalendarDialog({
       })
       .catch((err) => console.error("Error fetching daily history:", err))
       .finally(() => setIsLoading(false));
+
+    // Also fetch match history from server if authenticated
+    if (player) {
+      fetch("/api/stats")
+        .then((res) => res.json())
+        .then((data) => {
+          if (data?.history && Array.isArray(data.history)) {
+            const serverCounts: Record<string, number> = {};
+            for (const m of data.history) {
+              if (m.date) {
+                const dStr = getDailyDate(new Date(m.date));
+                serverCounts[dStr] = (serverCounts[dStr] || 0) + 1;
+              }
+            }
+            for (const [dStr, sCount] of Object.entries(serverCounts)) {
+              counts[dStr] = Math.max(counts[dStr] || 0, sCount);
+            }
+            setMatchCounts({ ...counts });
+          }
+        })
+        .catch(() => {});
+    }
   }, [isOpen, player]);
 
   // Compute Streak Details
@@ -149,7 +192,7 @@ export function DailyCalendarDialog({
 
   const flameStyle = FLAME_TIER_STYLES[streakInfo.flameTier];
 
-  // 14-week Activity Heatmap (GitHub-style 7x14 grid)
+  // 14-week Activity Heatmap (GitHub-style 7x14 grid) with Gradual Intensity Levels (0 to 4)
   const heatmapData = useMemo(() => {
     const todayDays = dateStringToDays(todayStr);
     const todayDate = new Date(todayDays * 86400000);
@@ -164,6 +207,8 @@ export function DailyCalendarDialog({
       days: Array<{
         dateStr: string;
         played: boolean;
+        totalCount: number;
+        level: number;
         isToday: boolean;
         isSelected: boolean;
         isFuture: boolean;
@@ -193,9 +238,21 @@ export function DailyCalendarDialog({
           lastMonth = cellMonth;
         }
 
+        const dailyDone = Boolean(historyMap[dStr]);
+        const otherMatches = matchCounts[dStr] || 0;
+        const totalActivities = (dailyDone ? 1 : 0) + otherMatches;
+
+        let level = 0;
+        if (totalActivities >= 6) level = 4;
+        else if (totalActivities >= 4) level = 3;
+        else if (totalActivities >= 2) level = 2;
+        else if (totalActivities >= 1) level = 1;
+
         days.push({
           dateStr: dStr,
-          played: Boolean(historyMap[dStr]),
+          played: dailyDone,
+          totalCount: totalActivities,
+          level,
           isToday: dStr === todayStr,
           isSelected: dStr === selectedDateStr,
           isFuture,
@@ -208,7 +265,7 @@ export function DailyCalendarDialog({
     }
 
     return weeks;
-  }, [historyMap, todayStr, selectedDateStr]);
+  }, [historyMap, matchCounts, todayStr, selectedDateStr]);
 
   const selectedRecord = historyMap[selectedDateStr];
 
@@ -425,10 +482,10 @@ export function DailyCalendarDialog({
                           title={`${cell.dateStr}: ${
                             cell.isFuture
                               ? "Data futura"
-                              : cell.played
-                              ? "Desafio Concluído ✓"
-                              : "Não jogado"
-                          }`}
+                              : cell.totalCount === 0
+                              ? "Nenhuma partida jogada"
+                              : `${cell.totalCount} ${cell.totalCount === 1 ? "partida jogada" : "partidas jogadas"}`
+                          }${cell.played ? " • Desafio Diário Concluído ✓" : ""}`}
                           onClick={() => {
                             if (!cell.isFuture) {
                               setSelectedDateStr(cell.dateStr);
@@ -438,9 +495,7 @@ export function DailyCalendarDialog({
                           className={`h-3 w-3 rounded-xs transition-all ${
                             cell.isFuture
                               ? "opacity-15 bg-game-border cursor-not-allowed"
-                              : cell.played
-                              ? "bg-purple-600 hover:bg-purple-500 shadow-xs cursor-pointer"
-                              : "bg-game-border/50 hover:bg-game-border cursor-pointer"
+                              : `${HEATMAP_LEVEL_STYLES[cell.level]} cursor-pointer`
                           } ${
                             cell.isSelected
                               ? "ring-2 ring-game-accent ring-offset-1 ring-offset-game-bg scale-125 z-10"
@@ -459,8 +514,11 @@ export function DailyCalendarDialog({
               <span>Clique em qualquer quadrado para inspecionar</span>
               <div className="flex items-center gap-1.5">
                 <span>Menos</span>
-                <span className="h-2.5 w-2.5 rounded-xs bg-game-border/50" />
-                <span className="h-2.5 w-2.5 rounded-xs bg-purple-600" />
+                <span title="0 partidas" className="h-2.5 w-2.5 rounded-xs bg-game-border/40" />
+                <span title="1 partida" className="h-2.5 w-2.5 rounded-xs bg-purple-900/50 border border-purple-500/30" />
+                <span title="2 a 3 partidas" className="h-2.5 w-2.5 rounded-xs bg-purple-700/80" />
+                <span title="4 a 5 partidas" className="h-2.5 w-2.5 rounded-xs bg-purple-600" />
+                <span title="6+ partidas" className="h-2.5 w-2.5 rounded-xs bg-purple-500 shadow-xs ring-1 ring-purple-300" />
                 <span>Mais</span>
               </div>
             </div>
@@ -469,9 +527,17 @@ export function DailyCalendarDialog({
           {/* Details Card for Selected Date */}
           <div className="rounded-2xl border border-game-border bg-game-bg/60 p-4 shadow-xs">
             <div className="mb-2 flex items-center justify-between">
-              <span className="text-xs font-black uppercase tracking-wider text-game-text-muted capitalize">
-                {formatFullDate(selectedDateStr)}
-              </span>
+              <div>
+                <span className="text-xs font-black uppercase tracking-wider text-game-text-muted capitalize">
+                  {formatFullDate(selectedDateStr)}
+                </span>
+                {matchCounts[selectedDateStr] ? (
+                  <div className="text-[11px] font-medium text-game-text-muted mt-0.5">
+                    Partidas registradas no dia:{" "}
+                    <strong className="text-game-text font-black">{matchCounts[selectedDateStr]}</strong>
+                  </div>
+                ) : null}
+              </div>
 
               {selectedRecord ? (
                 <span className="flex items-center gap-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-black text-emerald-500">
