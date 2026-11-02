@@ -52,7 +52,6 @@ import { DailyCalendarDialog } from "./scenes/daily-calendar-dialog";
 import { WinDialog } from "./scenes/win-dialog";
 import { IframeNoticeDialog } from "./scenes/iframe-notice-dialog";
 import { soundManager } from "@/lib/audio";
-import { ExternalLink } from "lucide-react";
 import { initClientAuthFetch, setClientAuthToken } from "@/lib/client-auth";
 
 initClientAuthFetch();
@@ -697,19 +696,6 @@ export default function GameScreen() {
       data-game-theme={theme}
       className="flex min-h-screen w-full flex-col items-center justify-center bg-game-bg px-4 py-6 transition-colors duration-300 relative"
     >
-      {isInIframe && (
-        <a
-          href={typeof window !== "undefined" ? window.location.href : "#"}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="fixed top-2 right-2 z-50 flex items-center gap-1.5 rounded-full border border-game-border bg-game-bg-subtle/90 px-3 py-1.5 text-xs font-bold text-game-text-muted backdrop-blur-xs shadow-md hover:border-game-accent hover:text-game-text transition-all"
-          title="Abrir jogo em nova aba para tela cheia e login direto"
-        >
-          <ExternalLink className="h-3.5 w-3.5" />
-          <span>Abrir em nova aba</span>
-        </a>
-      )}
-
       <main className="flex w-full flex-col items-center justify-center">
         {scene === "menu" && (
           <MenuScene
