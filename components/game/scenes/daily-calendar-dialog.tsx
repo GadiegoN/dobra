@@ -86,6 +86,7 @@ export function DailyCalendarDialog({
   const [isLoadingDayRanking, setIsLoadingDayRanking] = useState(false);
   const [showRanking, setShowRanking] = useState(false);
   const [streakFreeze, setStreakFreeze] = useState(false);
+  const [serverStreak, setServerStreak] = useState<StreakInfo | null>(null);
 
   const todayStr = getDailyDate();
 
@@ -93,7 +94,8 @@ export function DailyCalendarDialog({
   useEffect(() => {
     if (!isOpen) return;
 
-    setStreakFreeze(getLocalStreakFreeze());
+    const initialFreeze = getLocalStreakFreeze();
+    setStreakFreeze(initialFreeze);
     setSelectedDateStr(getDailyDate());
 
     // 1. Initial load from localStorage
@@ -106,13 +108,15 @@ export function DailyCalendarDialog({
 
     // 2. Fetch server history if authenticated
     setIsLoading(true);
-    const freezeAvail = getLocalStreakFreeze();
-    fetch(`/api/daily?freeze=${freezeAvail}`)
+    fetch(`/api/daily?freeze=${initialFreeze}`)
       .then((res) => res.json())
       .then((data) => {
-        if (data?.streakInfo?.streakFreezeAvailable) {
-          setStreakFreeze(true);
-          saveLocalStreakFreeze(true);
+        if (data?.streakInfo) {
+          setServerStreak(data.streakInfo);
+          if (data.streakInfo.streakFreezeAvailable) {
+            setStreakFreeze(true);
+            saveLocalStreakFreeze(true);
+          }
         }
         if (data?.userHistory && Array.isArray(data.userHistory)) {
           for (const item of data.userHistory) {
@@ -136,8 +140,12 @@ export function DailyCalendarDialog({
   // Compute Streak Details
   const streakInfo: StreakInfo = useMemo(() => {
     const dates = Object.keys(historyMap);
-    return calculateStreak(dates, streakFreeze, todayStr);
-  }, [historyMap, streakFreeze, todayStr]);
+    const local = calculateStreak(dates, streakFreeze || getLocalStreakFreeze(), todayStr);
+    if (serverStreak?.streakFreezeAvailable || streakFreeze || getLocalStreakFreeze()) {
+      local.streakFreezeAvailable = true;
+    }
+    return local;
+  }, [historyMap, streakFreeze, todayStr, serverStreak]);
 
   const flameStyle = FLAME_TIER_STYLES[streakInfo.flameTier];
 

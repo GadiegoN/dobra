@@ -382,6 +382,10 @@ export default function GameScreen() {
     const loadedBest = getStoredBestScore();
     const loadedLocalRanking = getStoredRanking();
 
+    if (loadedBest >= 2048) {
+      saveLocalStreakFreeze(true);
+    }
+
     setTheme(loadedTheme);
     setBestScore(loadedBest);
     setLocalRanking(loadedLocalRanking);

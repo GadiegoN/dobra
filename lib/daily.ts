@@ -77,7 +77,43 @@ export function saveLocalDailyResult(result: StoredDailyRecord): void {
 export function getLocalStreakFreeze(): boolean {
   if (typeof window === "undefined") return false;
   try {
-    return localStorage.getItem(STREAK_FREEZE_KEY) === "true";
+    if (localStorage.getItem(STREAK_FREEZE_KEY) === "true") return true;
+
+    // Auto-detect if user has scored >= 2048 or reached tile >= 2048 in any stored data:
+    // a) Local Best Score
+    const bestScoreStr = localStorage.getItem("dobra_best_score_v1");
+    if (bestScoreStr && Number(bestScoreStr) >= 2048) {
+      localStorage.setItem(STREAK_FREEZE_KEY, "true");
+      return true;
+    }
+
+    // b) Local Matches History
+    const rawMatches = localStorage.getItem("dobra_matches_history_v1");
+    if (rawMatches) {
+      const matches = JSON.parse(rawMatches);
+      if (
+        Array.isArray(matches) &&
+        matches.some((m) => Number(m.score) >= 2048 || Number(m.highestTile) >= 2048)
+      ) {
+        localStorage.setItem(STREAK_FREEZE_KEY, "true");
+        return true;
+      }
+    }
+
+    // c) Local Ranking Entries
+    const rawRanking = localStorage.getItem("dobra_ranking_v1");
+    if (rawRanking) {
+      const ranking = JSON.parse(rawRanking);
+      if (
+        Array.isArray(ranking) &&
+        ranking.some((r) => Number(r.score) >= 2048 || Number(r.highestTile) >= 2048)
+      ) {
+        localStorage.setItem(STREAK_FREEZE_KEY, "true");
+        return true;
+      }
+    }
+
+    return false;
   } catch {
     return false;
   }

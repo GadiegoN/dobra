@@ -167,6 +167,13 @@ export async function GET(request: NextRequest) {
 
         if (lbRows.length > 0 && (lbRows[0].highest_tile >= 2048 || lbRows[0].score >= 2048)) {
           freezeAvailable = true;
+        } else {
+          const seasonLbRows = (await sql`
+            SELECT score, highest_tile FROM season_leaderboard WHERE github_id = ${player.githubId} LIMIT 1;
+          `) as unknown as Array<{ score: number; highest_tile: number }>;
+          if (seasonLbRows.length > 0 && (seasonLbRows[0].highest_tile >= 2048 || seasonLbRows[0].score >= 2048)) {
+            freezeAvailable = true;
+          }
         }
       } catch (err) {
         console.error("Error checking leaderboard for streak freeze:", err);
