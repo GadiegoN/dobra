@@ -1,4 +1,5 @@
 import { GameMode, MatchHistoryItem, PersonalStats } from "@/types/game";
+import { safeStorage } from "./safe-storage";
 
 const HISTORY_STORAGE_KEY = "dobra_match_history_v1";
 
@@ -144,7 +145,7 @@ export function computeStatsFromHistory(history: MatchHistoryItem[]): PersonalSt
 export function getLocalHistory(): MatchHistoryItem[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(HISTORY_STORAGE_KEY);
+    const raw = safeStorage.getItem(HISTORY_STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
@@ -162,16 +163,16 @@ export function saveLocalMatch(match: MatchHistoryItem): PersonalStats {
     const current = getLocalHistory();
     // Prepend newest match
     const updated = [match, ...current].slice(0, 200); // retain last 200 matches locally
-    localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(updated));
+    safeStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(updated));
     return computeStatsFromHistory(updated);
   } catch (e) {
-    console.error("Failed to save match to localStorage", e);
+    console.error("Failed to save match to storage", e);
     return computeStatsFromHistory([match]);
   }
 }
 
 export function clearLocalStats(): void {
   if (typeof window === "undefined") return;
-  localStorage.removeItem(HISTORY_STORAGE_KEY);
+  safeStorage.removeItem(HISTORY_STORAGE_KEY);
 }
 

@@ -1,4 +1,5 @@
 import { GameTheme, RankingEntry } from "@/types/game";
+import { safeStorage } from "./safe-storage";
 
 const RANKING_KEY = "dobra-2048-ranking-v2";
 const BEST_KEY = "dobra-2048-best-score-v2";
@@ -8,7 +9,7 @@ const MAX_RANKING_ITEMS = 10;
 export function getStoredRanking(): RankingEntry[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(RANKING_KEY);
+    const raw = safeStorage.getItem(RANKING_KEY);
     return raw ? (JSON.parse(raw) as RankingEntry[]) : [];
   } catch {
     return [];
@@ -18,7 +19,7 @@ export function getStoredRanking(): RankingEntry[] {
 export function saveRanking(ranking: RankingEntry[]): void {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(RANKING_KEY, JSON.stringify(ranking));
+    safeStorage.setItem(RANKING_KEY, JSON.stringify(ranking));
   } catch {
     // Ignore storage quota errors
   }
@@ -62,7 +63,7 @@ export function addRankingEntry(
 export function clearRanking(): void {
   if (typeof window === "undefined") return;
   try {
-    localStorage.removeItem(RANKING_KEY);
+    safeStorage.removeItem(RANKING_KEY);
   } catch {
     // Ignore
   }
@@ -71,7 +72,7 @@ export function clearRanking(): void {
 export function getStoredBestScore(): number {
   if (typeof window === "undefined") return 0;
   try {
-    return Number(localStorage.getItem(BEST_KEY) || 0);
+    return Number(safeStorage.getItem(BEST_KEY) || 0);
   } catch {
     return 0;
   }
@@ -80,7 +81,7 @@ export function getStoredBestScore(): number {
 export function saveBestScore(score: number): void {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(BEST_KEY, String(score));
+    safeStorage.setItem(BEST_KEY, String(score));
   } catch {
     // Ignore
   }
@@ -89,7 +90,7 @@ export function saveBestScore(score: number): void {
 export function getStoredTheme(): GameTheme {
   if (typeof window === "undefined") return "classic";
   try {
-    const theme = localStorage.getItem(THEME_KEY) as GameTheme;
+    const theme = safeStorage.getItem(THEME_KEY) as GameTheme;
     if (["classic", "cyberpunk", "retro", "midnight"].includes(theme)) {
       return theme;
     }
@@ -102,7 +103,7 @@ export function getStoredTheme(): GameTheme {
 export function saveStoredTheme(theme: GameTheme): void {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(THEME_KEY, theme);
+    safeStorage.setItem(THEME_KEY, theme);
   } catch {
     // Ignore
   }

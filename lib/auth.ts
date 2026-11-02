@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { PlayerProfile } from "@/types/game";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 
 const SESSION_COOKIE_NAME = "dobra_player_session";
 
@@ -61,6 +61,20 @@ export function verifyProfileToken(token: string): PlayerProfile | null {
 
 export async function getPlayerSession(): Promise<PlayerProfile | null> {
   try {
+    // 1. Check Authorization: Bearer <token> (enables authentication inside cross-origin sandboxed iframes)
+    try {
+      const headerStore = await headers();
+      const authHeader = headerStore.get("authorization");
+      if (authHeader && authHeader.startsWith("Bearer ")) {
+        const bearerToken = authHeader.slice(7).trim();
+        const profile = verifyProfileToken(bearerToken);
+        if (profile) return profile;
+      }
+    } catch {
+      // In tests or environments without headers context, continue to cookie check
+    }
+
+    // 2. Fall back to standard session cookie
     const cookieStore = await cookies();
     const cookie = cookieStore.get(SESSION_COOKIE_NAME);
     if (!cookie?.value) return null;

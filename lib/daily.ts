@@ -1,4 +1,5 @@
 import { DailyChallengeConfig, FlameTier, StreakInfo } from "@/types/game";
+import { safeStorage } from "./safe-storage";
 
 /**
  * Retorna a data no formato YYYY-MM-DD com base no Horário de Brasília (America/Sao_Paulo, UTC-3).
@@ -54,7 +55,7 @@ export interface StoredDailyRecord {
 export function getLocalDailyHistory(): StoredDailyRecord[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(DAILY_HISTORY_KEY);
+    const raw = safeStorage.getItem(DAILY_HISTORY_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
@@ -68,7 +69,7 @@ export function saveLocalDailyResult(result: StoredDailyRecord): void {
   try {
     const current = getLocalDailyHistory();
     const updated = [result, ...current.filter((item) => item.date !== result.date)].slice(0, 365);
-    localStorage.setItem(DAILY_HISTORY_KEY, JSON.stringify(updated));
+    safeStorage.setItem(DAILY_HISTORY_KEY, JSON.stringify(updated));
   } catch (e) {
     console.error("Error saving local daily result", e);
   }
@@ -77,38 +78,38 @@ export function saveLocalDailyResult(result: StoredDailyRecord): void {
 export function getLocalStreakFreeze(): boolean {
   if (typeof window === "undefined") return false;
   try {
-    if (localStorage.getItem(STREAK_FREEZE_KEY) === "true") return true;
+    if (safeStorage.getItem(STREAK_FREEZE_KEY) === "true") return true;
 
     // Auto-detect if user has scored >= 2048 or reached tile >= 2048 in any stored data:
     // a) Local Best Score
-    const bestScoreStr = localStorage.getItem("dobra_best_score_v1");
+    const bestScoreStr = safeStorage.getItem("dobra_best_score_v1");
     if (bestScoreStr && Number(bestScoreStr) >= 2048) {
-      localStorage.setItem(STREAK_FREEZE_KEY, "true");
+      safeStorage.setItem(STREAK_FREEZE_KEY, "true");
       return true;
     }
 
     // b) Local Matches History
-    const rawMatches = localStorage.getItem("dobra_matches_history_v1");
+    const rawMatches = safeStorage.getItem("dobra_matches_history_v1");
     if (rawMatches) {
       const matches = JSON.parse(rawMatches);
       if (
         Array.isArray(matches) &&
         matches.some((m) => Number(m.score) >= 2048 || Number(m.highestTile) >= 2048)
       ) {
-        localStorage.setItem(STREAK_FREEZE_KEY, "true");
+        safeStorage.setItem(STREAK_FREEZE_KEY, "true");
         return true;
       }
     }
 
     // c) Local Ranking Entries
-    const rawRanking = localStorage.getItem("dobra_ranking_v1");
+    const rawRanking = safeStorage.getItem("dobra_ranking_v1");
     if (rawRanking) {
       const ranking = JSON.parse(rawRanking);
       if (
         Array.isArray(ranking) &&
         ranking.some((r) => Number(r.score) >= 2048 || Number(r.highestTile) >= 2048)
       ) {
-        localStorage.setItem(STREAK_FREEZE_KEY, "true");
+        safeStorage.setItem(STREAK_FREEZE_KEY, "true");
         return true;
       }
     }
@@ -122,7 +123,7 @@ export function getLocalStreakFreeze(): boolean {
 export function saveLocalStreakFreeze(available: boolean): void {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(STREAK_FREEZE_KEY, available ? "true" : "false");
+    safeStorage.setItem(STREAK_FREEZE_KEY, available ? "true" : "false");
   } catch {
     // ignore
   }

@@ -51,6 +51,10 @@ import { StatsDialog } from "./scenes/stats-dialog";
 import { DailyCalendarDialog } from "./scenes/daily-calendar-dialog";
 import { WinDialog } from "./scenes/win-dialog";
 import { soundManager } from "@/lib/audio";
+import { ExternalLink } from "lucide-react";
+import { initClientAuthFetch, setClientAuthToken } from "@/lib/client-auth";
+
+initClientAuthFetch();
 
 export default function GameScreen() {
   const [scene, setScene] = useState<GameScene>("menu");
@@ -79,6 +83,7 @@ export default function GameScreen() {
   const [isDailyChallengeActive, setIsDailyChallengeActive] = useState(false);
   const [dailyPlayed, setDailyPlayed] = useState(false);
   const [streakInfo, setStreakInfo] = useState<StreakInfo | null>(null);
+  const [isInIframe, setIsInIframe] = useState(false);
   const [friendChallenge, setFriendChallenge] = useState<FriendChallenge | null>(null);
 
   // Mode rules state
@@ -378,6 +383,22 @@ export default function GameScreen() {
 
   // Initialize client state
   useEffect(() => {
+    setIsInIframe(typeof window !== "undefined" && window.self !== window.top);
+
+    const handleAuthMessage = (event: MessageEvent) => {
+      if (event.data?.type === "DOBRA_AUTH_SUCCESS") {
+        if (event.data.token) {
+          setClientAuthToken(event.data.token);
+        }
+        if (event.data.profile) {
+          setPlayer(event.data.profile);
+        }
+        fetchGlobalRanking();
+        checkDailyStatus();
+      }
+    };
+    window.addEventListener("message", handleAuthMessage);
+
     const loadedTheme = getStoredTheme();
     const loadedBest = getStoredBestScore();
     const loadedLocalRanking = getStoredRanking();
@@ -413,6 +434,10 @@ export default function GameScreen() {
     }
 
     setMounted(true);
+
+    return () => {
+      window.removeEventListener("message", handleAuthMessage);
+    };
   }, [fetchPlayerSession, fetchGlobalRanking, checkDailyStatus]);
 
   // Mode: Time Rush countdown interval
@@ -610,11 +635,32 @@ export default function GameScreen() {
   };
 
   const handleLoginGithub = () => {
-    window.location.href = "/api/auth/github/login";
+    // Open in popup to avoid iframe X-Frame-Options: DENY restriction from GitHub
+    const width = 580;
+    const height = 700;
+    const left = typeof window !== "undefined" ? window.screenX + (window.outerWidth - width) / 2 : 100;
+    const top = typeof window !== "undefined" ? window.screenY + (window.outerHeight - height) / 2 : 100;
+
+    let popup: Window | null = null;
+    try {
+      popup = window.open(
+        "/api/auth/github/login",
+        "dobra_github_auth",
+        `width=${width},height=${height},left=${left},top=${top},status=0,menubar=0,toolbar=0`
+      );
+    } catch {
+      popup = null;
+    }
+
+    // Fallback if popup is blocked by browser
+    if (!popup || popup.closed || typeof popup.closed === "undefined") {
+      window.location.href = "/api/auth/github/login";
+    }
   };
 
   const handleLogoutGithub = async () => {
     try {
+      setClientAuthToken(null);
       await fetch("/api/auth/github/logout", { method: "POST" });
       setPlayer(null);
     } catch (err) {
@@ -641,8 +687,21 @@ export default function GameScreen() {
   return (
     <div
       data-game-theme={theme}
-      className="flex min-h-screen w-full flex-col items-center justify-center bg-game-bg px-4 py-6 transition-colors duration-300"
+      className="flex min-h-screen w-full flex-col items-center justify-center bg-game-bg px-4 py-6 transition-colors duration-300 relative"
     >
+      {isInIframe && (
+        <a
+          href={typeof window !== "undefined" ? window.location.href : "#"}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="fixed top-2 right-2 z-50 flex items-center gap-1.5 rounded-full border border-game-border bg-game-bg-subtle/90 px-3 py-1.5 text-xs font-bold text-game-text-muted backdrop-blur-xs shadow-md hover:border-game-accent hover:text-game-text transition-all"
+          title="Abrir jogo em nova aba para tela cheia e login direto"
+        >
+          <ExternalLink className="h-3.5 w-3.5" />
+          <span>Abrir em nova aba</span>
+        </a>
+      )}
+
       <main className="flex w-full flex-col items-center justify-center">
         {scene === "menu" && (
           <MenuScene

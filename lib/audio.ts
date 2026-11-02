@@ -1,3 +1,5 @@
+import { safeStorage } from "./safe-storage";
+
 // Web Audio API Synthesizer for DOBRA 2048 (Zero external assets, 100% synthesized)
 
 const SOUND_PREF_KEY = "dobra-2048-sound-enabled";
@@ -8,7 +10,7 @@ class SoundManager {
 
   constructor() {
     if (typeof window !== "undefined") {
-      const stored = localStorage.getItem(SOUND_PREF_KEY);
+      const stored = safeStorage.getItem(SOUND_PREF_KEY);
       this.soundEnabled = stored === null ? true : stored === "true";
     }
   }
@@ -37,7 +39,7 @@ class SoundManager {
   public setEnabled(enabled: boolean): void {
     this.soundEnabled = enabled;
     if (typeof window !== "undefined") {
-      localStorage.setItem(SOUND_PREF_KEY, String(enabled));
+      safeStorage.setItem(SOUND_PREF_KEY, String(enabled));
     }
   }
 
