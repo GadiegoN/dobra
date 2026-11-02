@@ -17,7 +17,22 @@ export type GameTheme =
   | "retro"
   | "midnight"
   | "sunset"
-  | "emerald";
+  | "emerald"
+  | "inferno"
+  | "cosmos";
+
+export type FlameTier = "gray" | "orange" | "blue" | "purple" | "gold";
+
+export interface StreakInfo {
+  currentStreak: number;
+  bestStreak: number;
+  totalCompleted: number;
+  flameTier: FlameTier;
+  title: string;
+  hasPlayedToday: boolean;
+  streakFreezeAvailable: boolean;
+  streakBonusPercent: number; // e.g. 0, 3, 5, 10
+}
 
 export interface RankingEntry {
   id: string;
@@ -36,6 +51,9 @@ export interface GlobalRankingEntry {
   score: number;
   highestTile: number;
   githubProfileUrl: string;
+  streak?: number;
+  flameTier?: FlameTier;
+  title?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -49,7 +67,7 @@ export interface PlayerProfile {
 }
 
 export interface ThemeUnlockCondition {
-  type: "score" | "tile" | "games_played" | "daily_challenge" | "mode_win";
+  type: "score" | "tile" | "games_played" | "daily_challenge" | "daily_streak" | "mode_win";
   value: number | string;
   description: string;
 }
@@ -168,5 +186,8 @@ export interface SeasonLeaderboardEntry {
   score: number;
   highestTile: number;
   githubProfileUrl: string;
+  streak?: number;
+  flameTier?: FlameTier;
+  title?: string;
   updatedAt: string;
 }

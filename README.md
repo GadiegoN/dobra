@@ -15,16 +15,27 @@ Repositório oficial: [https://github.com/GadiegoN/dobra](https://github.com/Gad
 - **Sobrevivência**: Uma nova peça aleatória surge a cada 3 segundos, desafiando o jogador a agir sob pressão contínua.
 - **Modo Alvo**: Desafio com meta de alcançar o bloco 1024 no menor número de movimentos, com vitória instantânea ao atingir o objetivo.
 
-### 2. Desafio Diário Determinístico & Calendário de Participação
+### 2. Desafio Diário & Sistema de Gamificação de Sequência (Streaks)
 - Todos os jogadores no mundo recebem o mesmo tabuleiro inicial e a mesma sequência de peças a cada dia.
 - Semente e virada calculadas rigorosamente no **Horário de Brasília (`America/Sao_Paulo`, UTC-3)** às 00:00:00.
-- Limite estrito de uma tentativa diária validada no servidor.
+- Limite estrito de uma tentativa diária validada no servidor via replay anti-cheat.
+- **Chamas de Fogo & Tiers Evolutivos**:
+  - Cinza (0 dias) • Laranja (1 a 6 dias) • Azul Ciano (7 a 13 dias) • Púrpura (14 a 29 dias) • Dourada Lendária (30+ dias com brilho pulsante).
+  - Badges visuais `🔥 X` exibidos no menu inicial e nos placares de líderes.
+- **Títulos Honorários Arcade**:
+  - *Novato da Dobra* • *Iniciado da Dobra* (3+ dias) • *Semana Perfeita* (7+ dias) • *Disciplinado de Ferro* (14+ dias) • *Mestre do Hábito* (30+ dias) • *Lenda Viva do 2048* (100+ dias).
+- **Escudo de Congelamento (Streak Freeze Shield)**:
+  - Protege e mantém a sequência caso o jogador perca 1 dia. Conquistado ao atingir o bloco 2048 no Modo Clássico!
+- **Multiplicador de Temporada**:
+  - Bônus cumulativo direto nas pontuações semanais da Temporada (+3% para 3 dias, +5% para 5 dias, +10% para 7+ dias).
+- **Mapa de Calor de Frequência (Heatmap estilo GitHub)**:
+  - Grade visual com histórico das últimas 10 semanas (70 dias) integrada no diálogo do calendário.
 - **Calendário Interativo**: visualização dos dias jogados no mês, com destaque visual e detalhamento da partida (pontos, maior peça, movimentos, duração e ranking do dia selecionado).
-- Ranking diário dedicado com desempate por tempo e menor número de movimentos.
 
 ### 3. Temporadas Competitivas
 - Sistema de temporadas semanais (segunda a domingo UTC).
 - Contagem regressiva em tempo real no Salão dos Recordes.
+- Multiplicador de sequência diária aplicado automaticamente nas pontuações.
 - Separação clara entre o ranking da temporada e o ranking histórico (All-Time).
 - Histórico navegável de temporadas anteriores.
 
@@ -41,13 +52,15 @@ Repositório oficial: [https://github.com/GadiegoN/dobra](https://github.com/Gad
 - Histórico detalhado com data, hora, modalidade, movimentos e duração.
 
 ### 6. Temas Desbloqueáveis & Conquistas
-- 6 temas cromáticos completos desenvolvidos com design tokens:
+- 8 temas cromáticos completos desenvolvidos com design tokens:
   - **Clássico** (Tons quentes e acolhedores)
   - **Cyberpunk** (Neon magenta e ciano)
   - **Retrô 8-bit** (Estilo Game Boy arcade)
   - **Midnight** (Dark slate moderno)
   - **Sunset** 🔒 (Desbloqueado ao atingir a peça 1024)
   - **Esmeralda** 🔒 (Desbloqueado ao alcançar 10.000 pontos)
+  - **Inferno** 🔥 🔒 (Desbloqueado com 7 dias consecutivos no Desafio Diário)
+  - **Cosmos** 🌌 🔒 (Desbloqueado com 14 dias consecutivos no Desafio Diário)
 
 ### 7. Cartão de Resultado Compartilhável
 - Renderização visual e exportação em alta resolução via HTML5 Canvas.

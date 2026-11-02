@@ -1,6 +1,6 @@
 "use client";
 
-import { FriendChallenge, GameMode, GameTheme, PlayerProfile } from "@/types/game";
+import { FriendChallenge, GameMode, GameTheme, PlayerProfile, StreakInfo } from "@/types/game";
 import { ThemePicker } from "../theme-picker";
 import {
   Play,
@@ -23,6 +23,7 @@ import {
   Target,
   Swords,
   CheckCircle2,
+  Flame,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -43,6 +44,7 @@ interface MenuSceneProps {
   onOpenDailyCalendar: () => void;
   onStartDailyChallenge: () => void;
   dailyPlayed: boolean;
+  streakInfo?: StreakInfo | null;
   friendChallenge: FriendChallenge | null;
   localRankingCount: number;
   globalRankingCount: number;
@@ -75,6 +77,7 @@ export function MenuScene({
   onOpenDailyCalendar,
   onStartDailyChallenge,
   dailyPlayed,
+  streakInfo,
   friendChallenge,
   localRankingCount,
   globalRankingCount,
@@ -250,7 +253,26 @@ export function MenuScene({
             <Calendar className="h-5 w-5" />
           </div>
           <div>
-            <div className="text-xs font-black text-game-text">Desafio Diário</div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-black text-game-text">Desafio Diário</span>
+              {streakInfo && streakInfo.currentStreak > 0 && (
+                <span
+                  title={`Sequência ativa: ${streakInfo.currentStreak} dias (${streakInfo.title})`}
+                  className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-black ${
+                    streakInfo.flameTier === "gold"
+                      ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/40 animate-pulse"
+                      : streakInfo.flameTier === "purple"
+                      ? "bg-purple-500/20 text-purple-400 border border-purple-500/40"
+                      : streakInfo.flameTier === "blue"
+                      ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/40"
+                      : "bg-amber-500/20 text-amber-500 border border-amber-500/40"
+                  }`}
+                >
+                  <Flame className="h-2.5 w-2.5 fill-current" />
+                  <span>{streakInfo.currentStreak}</span>
+                </span>
+              )}
+            </div>
             <div className="text-[11px] text-game-text-muted">
               {dailyPlayed ? (
                 <span className="flex items-center gap-1 text-emerald-500 font-bold">

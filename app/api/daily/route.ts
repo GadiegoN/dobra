@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPlayerSession } from "@/lib/auth";
 import { getDb, ensureDatabaseSchema } from "@/lib/db";
-import { getDailyConfig, getDailyDate } from "@/lib/daily";
+import { getDailyConfig, getDailyDate, calculateStreak } from "@/lib/daily";
 import { getCurrentSeason, ensureSeasonExists } from "@/lib/seasons";
 import { DailyChallengeResult, Direction } from "@/types/game";
 import { replayGame } from "@/lib/game-engine";
@@ -158,12 +158,20 @@ export async function GET(request: NextRequest) {
       }));
     }
 
+    const freezeParam = searchParams.get("freeze") === "true";
+    const streakInfo = calculateStreak(
+      userHistory.map((h) => h.date),
+      freezeParam,
+      getDailyDate()
+    );
+
     return NextResponse.json({
       config,
       hasPlayed,
       userResult,
       ranking,
       userHistory,
+      streakInfo,
     });
   } catch (error) {
     console.error("Error fetching daily challenge:", error);
@@ -242,7 +250,25 @@ export async function POST(request: NextRequest) {
       );
     `;
 
-    // Also record score to current weekly season leaderboard
+    // Calculate streak with the newly added challenge date
+    let streakInfo = calculateStreak([dateParam], false, getDailyDate());
+    try {
+      const pastHistoryRows = (await sql`
+        SELECT to_char(challenge_date, 'YYYY-MM-DD') as c_date
+        FROM daily_challenge_results
+        WHERE github_id = ${player.githubId}
+      `) as unknown as Array<{ c_date: string }>;
+      const allDates = Array.from(new Set([...pastHistoryRows.map((r) => r.c_date), dateParam]));
+      streakInfo = calculateStreak(allDates, false, getDailyDate());
+    } catch (e) {
+      console.error("Error computing updated streak:", e);
+    }
+
+    // Also record score to current weekly season leaderboard (applying streak multiplier!)
+    const boostedSeasonScore = streakInfo.streakBonusPercent > 0
+      ? Math.round(replay.score * (1 + streakInfo.streakBonusPercent / 100))
+      : replay.score;
+
     try {
       const currentSeason = getCurrentSeason();
       await ensureSeasonExists(currentSeason);
@@ -265,7 +291,7 @@ export async function POST(request: NextRequest) {
           ${player.username},
           ${player.displayName},
           ${player.avatarUrl},
-          ${replay.score},
+          ${boostedSeasonScore},
           ${replay.highestTile},
           ${player.githubProfileUrl},
           NOW(),
@@ -287,8 +313,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       score: replay.score,
+      boostedSeasonScore,
       highestTile: replay.highestTile,
       movesCount: replay.movesPlayed,
+      streakInfo,
     });
   } catch (error) {
     console.error("Error saving daily challenge result:", error);

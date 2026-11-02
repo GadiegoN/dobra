@@ -387,6 +387,90 @@
     --tile-super-text: #062319;
 }
 
+/* 7. INFERNO / LAVA FLAME (Streak 7+ Days) */
+[data-game-theme="inferno"] {
+    --game-bg: #1c0808;
+    --game-bg-subtle: #2d0e0e;
+    --game-text: #ffe0b2;
+    --game-text-muted: #ff8a65;
+    --game-board: #3b1111;
+    --game-cell-empty: rgba(255, 87, 34, 0.18);
+    --game-accent: #ff3d00;
+    --game-accent-hover: #dd2c00;
+    --game-accent-text: #ffffff;
+    --game-card-bg: #4a1414;
+    --game-card-text: #ffe0b2;
+    --game-card-label: #ff8a65;
+    --game-border: #ff3d0066;
+
+    --tile-2-bg: #3d1414;
+    --tile-2-text: #ffccbc;
+    --tile-4-bg: #521919;
+    --tile-4-text: #ffe0b2;
+    --tile-8-bg: #7a1d13;
+    --tile-8-text: #ffffff;
+    --tile-16-bg: #a32210;
+    --tile-16-text: #ffffff;
+    --tile-32-bg: #c92c0c;
+    --tile-32-text: #ffffff;
+    --tile-64-bg: #e63900;
+    --tile-64-text: #ffffff;
+    --tile-128-bg: #ff5722;
+    --tile-128-text: #ffffff;
+    --tile-256-bg: #ff7043;
+    --tile-256-text: #ffffff;
+    --tile-512-bg: #ff9800;
+    --tile-512-text: #1c0808;
+    --tile-1024-bg: #ffb300;
+    --tile-1024-text: #1c0808;
+    --tile-2048-bg: #ffea00;
+    --tile-2048-text: #1c0808;
+    --tile-super-bg: #ffffff;
+    --tile-super-text: #d50000;
+}
+
+/* 8. COSMOS / NEBULA (Streak 14+ Days) */
+[data-game-theme="cosmos"] {
+    --game-bg: #0b071a;
+    --game-bg-subtle: #150f2e;
+    --game-text: #e0e7ff;
+    --game-text-muted: #a5b4fc;
+    --game-board: #1c1440;
+    --game-cell-empty: rgba(129, 140, 248, 0.18);
+    --game-accent: #818cf8;
+    --game-accent-hover: #6366f1;
+    --game-accent-text: #ffffff;
+    --game-card-bg: #231854;
+    --game-card-text: #e0e7ff;
+    --game-card-label: #c7d2fe;
+    --game-border: #818cf866;
+
+    --tile-2-bg: #1e1b4b;
+    --tile-2-text: #e0e7ff;
+    --tile-4-bg: #2e1065;
+    --tile-4-text: #e0e7ff;
+    --tile-8-bg: #4c1d95;
+    --tile-8-text: #ffffff;
+    --tile-16-bg: #5b21b6;
+    --tile-16-text: #ffffff;
+    --tile-32-bg: #6d28d9;
+    --tile-32-text: #ffffff;
+    --tile-64-bg: #7c3aed;
+    --tile-64-text: #ffffff;
+    --tile-128-bg: #8b5cf6;
+    --tile-128-text: #ffffff;
+    --tile-256-bg: #a855f7;
+    --tile-256-text: #ffffff;
+    --tile-512-bg: #c084fc;
+    --tile-512-text: #0b071a;
+    --tile-1024-bg: #38bdf8;
+    --tile-1024-text: #0b071a;
+    --tile-2048-bg: #818cf8;
+    --tile-2048-text: #0b071a;
+    --tile-super-bg: #f43f5e;
+    --tile-super-text: #ffffff;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

@@ -12,6 +12,7 @@ import {
   MatchHistoryItem,
   PlayerProfile,
   RankingEntry,
+  StreakInfo,
 } from "@/types/game";
 import {
   emptyBoard,
@@ -33,7 +34,15 @@ import {
   isScoreEligibleForRanking,
 } from "@/lib/storage";
 import { saveLocalMatch } from "@/lib/stats";
-import { getDailyConfig, getDailyDate, saveLocalDailyResult } from "@/lib/daily";
+import {
+  getDailyConfig,
+  getDailyDate,
+  saveLocalDailyResult,
+  getLocalDailyHistory,
+  calculateStreak,
+  getLocalStreakFreeze,
+  saveLocalStreakFreeze,
+} from "@/lib/daily";
 import { MenuScene } from "./scenes/menu-scene";
 import { PlayScene } from "./scenes/play-scene";
 import { GameOverScene } from "./scenes/game-over-scene";
@@ -69,6 +78,7 @@ export default function GameScreen() {
   // Daily Challenge & Friend Challenge state
   const [isDailyChallengeActive, setIsDailyChallengeActive] = useState(false);
   const [dailyPlayed, setDailyPlayed] = useState(false);
+  const [streakInfo, setStreakInfo] = useState<StreakInfo | null>(null);
   const [friendChallenge, setFriendChallenge] = useState<FriendChallenge | null>(null);
 
   // Mode rules state
@@ -149,17 +159,32 @@ export default function GameScreen() {
     }
   }, []);
 
-  // Check Daily challenge status
+  // Check Daily challenge status and streak info
   const checkDailyStatus = useCallback(async () => {
+    const freezeAvail = getLocalStreakFreeze();
+    const today = getDailyDate();
     try {
-      const res = await fetch("/api/daily");
+      const res = await fetch(`/api/daily?freeze=${freezeAvail}`);
       if (res.ok) {
         const data = await res.json();
         setDailyPlayed(Boolean(data.hasPlayed));
+        if (data.streakInfo) {
+          setStreakInfo(data.streakInfo);
+          return;
+        }
       }
     } catch {
       // ignore
     }
+
+    // Fallback: calculate streak from local storage
+    const localHistory = getLocalDailyHistory();
+    const localStreak = calculateStreak(
+      localHistory.map((h) => h.date),
+      freezeAvail,
+      today
+    );
+    setStreakInfo(localStreak);
   }, []);
 
   // Request new signed game session token from server
@@ -275,6 +300,7 @@ export default function GameScreen() {
         }),
       });
       setDailyPlayed(true);
+      checkDailyStatus();
     } catch (err) {
       console.error("Error submitting daily challenge:", err);
     }
@@ -547,6 +573,9 @@ export default function GameScreen() {
         setHasAcknowledgedWin(true);
         setIsWinDialogOpen(true);
         soundManager.playWin();
+        if (modeRef.current === "classic") {
+          saveLocalStreakFreeze(true);
+        }
       }
 
       // 7. Game Over check
@@ -619,6 +648,7 @@ export default function GameScreen() {
             onOpenDailyCalendar={() => setIsDailyCalendarOpen(true)}
             onStartDailyChallenge={handleStartDailyChallenge}
             dailyPlayed={dailyPlayed}
+            streakInfo={streakInfo}
             friendChallenge={friendChallenge}
             localRankingCount={localRanking.length}
             globalRankingCount={globalRanking.length}

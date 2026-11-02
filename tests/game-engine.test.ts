@@ -10,7 +10,13 @@ import {
   newGame,
   replayGame,
 } from "@/lib/game-engine";
-import { getDailyDate, getDailySeed, getDailyConfig } from "@/lib/daily";
+import {
+  getDailyDate,
+  getDailySeed,
+  getDailyConfig,
+  calculateStreak,
+} from "@/lib/daily";
+import { THEMES, isThemeUnlocked } from "@/components/game/theme-picker";
 import { Board, Direction } from "@/types/game";
 
 describe("Game Engine - Core Logic", () => {
@@ -266,6 +272,115 @@ describe("Game Engine - Core Logic", () => {
 
       expect(seed1).toBe(seed2);
       expect(seed1).not.toBe(seedNextDay);
+    });
+  });
+
+  describe("Daily Challenge - Streak Gamification Engine", () => {
+    const today = "2026-11-10";
+
+    it("returns zero streak for empty played history", () => {
+      const result = calculateStreak([], false, today);
+      expect(result.currentStreak).toBe(0);
+      expect(result.bestStreak).toBe(0);
+      expect(result.flameTier).toBe("gray");
+      expect(result.title).toBe("Novato da Dobra");
+      expect(result.hasPlayedToday).toBe(false);
+      expect(result.streakBonusPercent).toBe(0);
+    });
+
+    it("computes 3-day active streak when played today and prior 2 days", () => {
+      const dates = ["2026-11-10", "2026-11-09", "2026-11-08"];
+      const result = calculateStreak(dates, false, today);
+
+      expect(result.currentStreak).toBe(3);
+      expect(result.bestStreak).toBe(3);
+      expect(result.hasPlayedToday).toBe(true);
+      expect(result.flameTier).toBe("orange");
+      expect(result.title).toBe("Iniciado da Dobra");
+      expect(result.streakBonusPercent).toBe(3);
+    });
+
+    it("keeps streak intact if today is not played yet but yesterday was played", () => {
+      const dates = ["2026-11-09", "2026-11-08", "2026-11-07"];
+      const result = calculateStreak(dates, false, today);
+
+      expect(result.currentStreak).toBe(3);
+      expect(result.hasPlayedToday).toBe(false);
+    });
+
+    it("resets current streak to 0 if yesterday was missed without streak freeze shield", () => {
+      const dates = ["2026-11-08", "2026-11-07", "2026-11-06"]; // missed 2026-11-09
+      const result = calculateStreak(dates, false, today);
+
+      expect(result.currentStreak).toBe(0);
+      expect(result.bestStreak).toBe(3);
+      expect(result.flameTier).toBe("gray");
+    });
+
+    it("absorbs 1 missed day when streak freeze shield is active", () => {
+      // Missed yesterday (2026-11-09), but played day before (2026-11-08 and 2026-11-07)
+      const dates = ["2026-11-08", "2026-11-07"];
+      const result = calculateStreak(dates, true, today);
+
+      expect(result.currentStreak).toBe(2);
+      expect(result.streakFreezeAvailable).toBe(false); // Shield was consumed!
+    });
+
+    it("awards 7-day Perfect Week with blue flame tier and 10% season multiplier", () => {
+      const dates = [
+        "2026-11-10",
+        "2026-11-09",
+        "2026-11-08",
+        "2026-11-07",
+        "2026-11-06",
+        "2026-11-05",
+        "2026-11-04",
+      ];
+      const result = calculateStreak(dates, false, today);
+
+      expect(result.currentStreak).toBe(7);
+      expect(result.flameTier).toBe("blue");
+      expect(result.title).toBe("Semana Perfeita");
+      expect(result.streakBonusPercent).toBe(10);
+    });
+
+    it("awards 14-day streak with purple flame tier and Disciplinado de Ferro title", () => {
+      const dates: string[] = [];
+      for (let i = 0; i < 14; i++) {
+        const d = new Date("2026-11-10T12:00:00Z");
+        d.setUTCDate(d.getUTCDate() - i);
+        dates.push(d.toISOString().slice(0, 10));
+      }
+      const result = calculateStreak(dates, false, today);
+
+      expect(result.currentStreak).toBe(14);
+      expect(result.flameTier).toBe("purple");
+      expect(result.title).toBe("Disciplinado de Ferro");
+    });
+
+    it("awards 30-day streak with gold flame tier and Mestre do Hábito title", () => {
+      const dates: string[] = [];
+      for (let i = 0; i < 30; i++) {
+        const d = new Date("2026-11-10T12:00:00Z");
+        d.setUTCDate(d.getUTCDate() - i);
+        dates.push(d.toISOString().slice(0, 10));
+      }
+      const result = calculateStreak(dates, false, today);
+
+      expect(result.currentStreak).toBe(30);
+      expect(result.flameTier).toBe("gold");
+      expect(result.title).toBe("Mestre do Hábito");
+    });
+
+    it("correctly unlocks secret themes (Inferno at 7 days, Cosmos at 14 days)", () => {
+      const infernoTheme = THEMES.find((t) => t.id === "inferno")!;
+      const cosmosTheme = THEMES.find((t) => t.id === "cosmos")!;
+
+      expect(isThemeUnlocked(infernoTheme, null, 6)).toBe(false);
+      expect(isThemeUnlocked(infernoTheme, null, 7)).toBe(true);
+
+      expect(isThemeUnlocked(cosmosTheme, null, 13)).toBe(false);
+      expect(isThemeUnlocked(cosmosTheme, null, 14)).toBe(true);
     });
   });
 });

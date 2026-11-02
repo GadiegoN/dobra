@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb, ensureLeaderboardTable } from "@/lib/db";
 import { getPlayerSession } from "@/lib/auth";
-import { Direction, GlobalRankingEntry } from "@/types/game";
+import { Direction, GlobalRankingEntry, FlameTier } from "@/types/game";
+import { calculateStreak, getDailyDate } from "@/lib/daily";
 import {
   validateScoreSanity,
   verifyGameSessionToken,
@@ -46,18 +47,56 @@ export async function GET() {
       LIMIT 50;
     `) as unknown as DbLeaderboardRow[];
 
-    const ranking: GlobalRankingEntry[] = rows.map((r) => ({
-      id: String(r.id),
-      githubId: String(r.github_id),
-      username: String(r.username),
-      displayName: r.display_name ? String(r.display_name) : null,
-      avatarUrl: String(r.avatar_url),
-      score: Number(r.score),
-      highestTile: Number(r.highest_tile),
-      githubProfileUrl: String(r.github_profile_url),
-      createdAt: new Date(r.created_at).toISOString(),
-      updatedAt: new Date(r.updated_at).toISOString(),
-    }));
+    const githubIds = rows.map((r) => String(r.github_id)).filter(Boolean);
+    const streaksByGithubId: Record<string, { streak: number; flameTier: FlameTier; title: string }> = {};
+
+    if (githubIds.length > 0) {
+      try {
+        const dailyRows = (await sql`
+          SELECT github_id, to_char(challenge_date, 'YYYY-MM-DD') as c_date
+          FROM daily_challenge_results
+          WHERE github_id = ANY(${githubIds})
+        `) as unknown as Array<{ github_id: string; c_date: string }>;
+
+        const datesByPlayer: Record<string, string[]> = {};
+        for (const row of dailyRows) {
+          if (!datesByPlayer[row.github_id]) datesByPlayer[row.github_id] = [];
+          datesByPlayer[row.github_id].push(row.c_date);
+        }
+
+        for (const gId of githubIds) {
+          const dates = datesByPlayer[gId] || [];
+          const s = calculateStreak(dates, false, getDailyDate());
+          streaksByGithubId[gId] = {
+            streak: s.currentStreak,
+            flameTier: s.flameTier,
+            title: s.title,
+          };
+        }
+      } catch (streakErr) {
+        console.error("Error computing streaks for global ranking:", streakErr);
+      }
+    }
+
+    const ranking: GlobalRankingEntry[] = rows.map((r) => {
+      const gId = String(r.github_id);
+      const st = streaksByGithubId[gId];
+      return {
+        id: String(r.id),
+        githubId: gId,
+        username: String(r.username),
+        displayName: r.display_name ? String(r.display_name) : null,
+        avatarUrl: String(r.avatar_url),
+        score: Number(r.score),
+        highestTile: Number(r.highest_tile),
+        githubProfileUrl: String(r.github_profile_url),
+        streak: st?.streak,
+        flameTier: st?.flameTier,
+        title: st?.title,
+        createdAt: new Date(r.created_at).toISOString(),
+        updatedAt: new Date(r.updated_at).toISOString(),
+      };
+    });
 
     return NextResponse.json({ ranking });
   } catch (error) {

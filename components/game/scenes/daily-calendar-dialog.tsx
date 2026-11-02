@@ -8,15 +8,21 @@ import {
   X,
   Trophy,
   Flame,
-  Clock,
-  Footprints,
+  Shield,
+  Sparkles,
   Play,
   CheckCircle2,
-  AlertCircle,
-  ExternalLink,
 } from "lucide-react";
-import { DailyChallengeResult, PlayerProfile } from "@/types/game";
-import { getDailyDate, getLocalDailyHistory, StoredDailyRecord } from "@/lib/daily";
+import { DailyChallengeResult, PlayerProfile, FlameTier, StreakInfo } from "@/types/game";
+import {
+  getDailyDate,
+  getLocalDailyHistory,
+  StoredDailyRecord,
+  calculateStreak,
+  getLocalStreakFreeze,
+  dateStringToDays,
+  daysToDateString,
+} from "@/lib/daily";
 
 interface DailyCalendarDialogProps {
   isOpen: boolean;
@@ -24,6 +30,47 @@ interface DailyCalendarDialogProps {
   player: PlayerProfile | null;
   onStartDailyChallenge: () => void;
 }
+
+const FLAME_TIER_STYLES: Record<
+  FlameTier,
+  { text: string; bg: string; fill: string; border: string; glow: string }
+> = {
+  gray: {
+    text: "text-game-text-muted",
+    bg: "bg-game-border/30",
+    fill: "fill-transparent",
+    border: "border-game-border",
+    glow: "",
+  },
+  orange: {
+    text: "text-amber-500",
+    bg: "bg-amber-500/15",
+    fill: "fill-amber-500",
+    border: "border-amber-500/30",
+    glow: "shadow-[0_0_12px_rgba(245,158,11,0.25)]",
+  },
+  blue: {
+    text: "text-cyan-400",
+    bg: "bg-cyan-500/15",
+    fill: "fill-cyan-400",
+    border: "border-cyan-500/30",
+    glow: "shadow-[0_0_12px_rgba(34,211,238,0.25)]",
+  },
+  purple: {
+    text: "text-purple-400",
+    bg: "bg-purple-500/15",
+    fill: "fill-purple-400",
+    border: "border-purple-500/30",
+    glow: "shadow-[0_0_12px_rgba(168,85,247,0.25)]",
+  },
+  gold: {
+    text: "text-yellow-400",
+    bg: "bg-yellow-500/15",
+    fill: "fill-yellow-400",
+    border: "border-yellow-500/30",
+    glow: "shadow-[0_0_16px_rgba(250,204,21,0.35)] animate-pulse",
+  },
+};
 
 export function DailyCalendarDialog({
   isOpen,
@@ -37,10 +84,15 @@ export function DailyCalendarDialog({
   const [dayRanking, setDayRanking] = useState<DailyChallengeResult[]>([]);
   const [isLoadingDayRanking, setIsLoadingDayRanking] = useState(false);
   const [showRanking, setShowRanking] = useState(false);
+  const [streakFreeze, setStreakFreeze] = useState(false);
+
+  const todayStr = getDailyDate();
 
   // Load history from API + localStorage
   useEffect(() => {
     if (!isOpen) return;
+
+    setStreakFreeze(getLocalStreakFreeze());
 
     // 1. Initial load from localStorage
     const local = getLocalDailyHistory();
@@ -52,7 +104,8 @@ export function DailyCalendarDialog({
 
     // 2. Fetch server history if authenticated
     setIsLoading(true);
-    fetch("/api/daily")
+    const freezeAvail = getLocalStreakFreeze();
+    fetch(`/api/daily?freeze=${freezeAvail}`)
       .then((res) => res.json())
       .then((data) => {
         if (data?.userHistory && Array.isArray(data.userHistory)) {
@@ -74,6 +127,14 @@ export function DailyCalendarDialog({
       .finally(() => setIsLoading(false));
   }, [isOpen, player]);
 
+  // Compute Streak Details
+  const streakInfo: StreakInfo = useMemo(() => {
+    const dates = Object.keys(historyMap);
+    return calculateStreak(dates, streakFreeze, todayStr);
+  }, [historyMap, streakFreeze, todayStr]);
+
+  const flameStyle = FLAME_TIER_STYLES[streakInfo.flameTier];
+
   // Played dates for calendar modifier
   const playedDates = useMemo(() => {
     return Object.keys(historyMap).map((dateStr) => {
@@ -91,8 +152,23 @@ export function DailyCalendarDialog({
     return `${year}-${month}-${day}`;
   }, [selectedDate]);
 
-  const todayStr = getDailyDate();
   const selectedRecord = historyMap[selectedDateStr];
+
+  // 10-week activity heatmap (70 days)
+  const heatmapDays = useMemo(() => {
+    const list: Array<{ dateStr: string; played: boolean; isToday: boolean; isSelected: boolean }> = [];
+    const todayDays = dateStringToDays(todayStr);
+    for (let i = 69; i >= 0; i--) {
+      const dStr = daysToDateString(todayDays - i);
+      list.push({
+        dateStr: dStr,
+        played: Boolean(historyMap[dStr]),
+        isToday: dStr === todayStr,
+        isSelected: dStr === selectedDateStr,
+      });
+    }
+    return list;
+  }, [historyMap, todayStr, selectedDateStr]);
 
   // Fetch ranking for selected date when requested
   useEffect(() => {
@@ -136,17 +212,22 @@ export function DailyCalendarDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-in fade-in duration-150">
-      <div className="relative flex max-h-[92vh] w-full max-w-lg flex-col rounded-2xl border-2 border-game-border bg-game-bg-subtle p-5 shadow-2xl overflow-hidden">
+      <div className="relative flex max-h-[94vh] w-full max-w-lg flex-col rounded-2xl border-2 border-game-border bg-game-bg-subtle p-5 shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="mb-3 flex items-center justify-between border-b border-game-border pb-3">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-500/20 text-purple-500 shadow-xs">
-              <CalendarIcon className="h-5 w-5" />
+            <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${flameStyle.bg} ${flameStyle.text} border ${flameStyle.border} ${flameStyle.glow}`}>
+              <Flame className={`h-5 w-5 ${flameStyle.fill}`} />
             </div>
             <div>
-              <h2 className="text-base font-black text-game-text">Calendário de Desafios</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-black text-game-text">Desafios & Sequência</h2>
+                <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${flameStyle.bg} ${flameStyle.text} border ${flameStyle.border}`}>
+                  {streakInfo.title}
+                </span>
+              </div>
               <p className="text-xs text-game-text-muted">
-                Histórico de dias jogados e estatísticas
+                Mantenha a chama acesa todos os dias para desbloquear bônus e temas
               </p>
             </div>
           </div>
@@ -162,6 +243,115 @@ export function DailyCalendarDialog({
 
         {/* Scrollable Container */}
         <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+          {/* Top Streak Gamification KPI Banner */}
+          <div className={`rounded-2xl border ${flameStyle.border} ${flameStyle.bg} p-3.5 flex flex-col gap-2.5 shadow-xs`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5">
+                  <Flame className={`h-7 w-7 ${flameStyle.text} ${flameStyle.fill}`} />
+                  <span className="text-2xl font-black text-game-text tabular-nums">
+                    {streakInfo.currentStreak}
+                  </span>
+                  <span className="text-xs font-bold text-game-text-muted uppercase">
+                    {streakInfo.currentStreak === 1 ? "dia" : "dias"}
+                  </span>
+                </div>
+                <div className="h-7 w-px bg-game-border/60" />
+                <div className="text-left">
+                  <span className="block text-[10px] font-bold uppercase text-game-text-muted">
+                    Melhor Sequência
+                  </span>
+                  <span className="text-xs font-black text-game-text tabular-nums">
+                    {streakInfo.bestStreak} dias
+                  </span>
+                </div>
+              </div>
+
+              {/* Shield Status */}
+              <div className="flex items-center gap-1.5 rounded-xl border border-game-border/60 bg-game-bg/70 px-2.5 py-1 text-right">
+                <Shield
+                  className={`h-4 w-4 ${
+                    streakInfo.streakFreezeAvailable
+                      ? "text-blue-400 fill-blue-400/20"
+                      : "text-game-text-muted opacity-40"
+                  }`}
+                />
+                <div className="text-[10px]">
+                  <span className="block font-black leading-tight text-game-text">
+                    {streakInfo.streakFreezeAvailable ? "Escudo Ativo" : "Sem Escudo"}
+                  </span>
+                  <span className="text-[9px] text-game-text-muted">
+                    {streakInfo.streakFreezeAvailable ? "Protege 1 falta" : "Faça 2048 p/ recarregar"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Streak Multiplier & Theme Progress Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-1 border-t border-game-border/40 pt-2 text-[11px]">
+              <div className="flex items-center gap-1.5 text-game-text">
+                <Sparkles className="h-3.5 w-3.5 text-amber-400" />
+                <span>
+                  Bônus na Temporada:{" "}
+                  <strong className="text-game-accent">
+                    +{streakInfo.streakBonusPercent}% de pontos
+                  </strong>
+                </span>
+              </div>
+              <div className="text-[10px] font-bold text-game-text-muted">
+                {streakInfo.currentStreak < 7 ? (
+                  <span>Faltam {7 - streakInfo.currentStreak} dias p/ Tema Inferno 🔥</span>
+                ) : streakInfo.currentStreak < 14 ? (
+                  <span>Faltam {14 - streakInfo.currentStreak} dias p/ Tema Cosmos 🌌</span>
+                ) : (
+                  <span className="text-purple-400">Todos os temas de sequência liberados! 🌟</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Activity Heatmap Grid (Last 10 Weeks) */}
+          <div className="rounded-2xl border border-game-border bg-game-bg p-3 shadow-xs">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-[11px] font-black uppercase tracking-wider text-game-text">
+                Frequência de Atividade (Últimas 10 semanas)
+              </span>
+              <span className="text-[10px] text-game-text-muted">
+                {streakInfo.totalCompleted} desafios concluídos
+              </span>
+            </div>
+
+            <div className="flex items-center justify-center overflow-x-auto py-1">
+              <div className="grid grid-flow-col grid-rows-7 gap-1">
+                {heatmapDays.map((cell) => (
+                  <button
+                    key={cell.dateStr}
+                    type="button"
+                    title={`${cell.dateStr}: ${cell.played ? "Concluído" : "Não jogado"}`}
+                    onClick={() => {
+                      const [y, m, d] = cell.dateStr.split("-").map(Number);
+                      setSelectedDate(new Date(y, m - 1, d));
+                      setShowRanking(false);
+                    }}
+                    className={`h-3 w-3 rounded-xs transition-all ${
+                      cell.played
+                        ? "bg-purple-600 hover:bg-purple-500 shadow-xs"
+                        : "bg-game-border/40 hover:bg-game-border"
+                    } ${cell.isSelected ? "ring-2 ring-game-accent ring-offset-1 ring-offset-game-bg scale-125 z-10" : ""} ${
+                      cell.isToday && !cell.isSelected ? "border border-game-accent" : ""
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
+            <div className="mt-2 flex items-center justify-end gap-2 text-[10px] text-game-text-muted">
+              <span>Menos</span>
+              <span className="h-2.5 w-2.5 rounded-xs bg-game-border/40" />
+              <span className="h-2.5 w-2.5 rounded-xs bg-purple-600" />
+              <span>Mais</span>
+            </div>
+          </div>
+
           {/* Calendar Picker */}
           <div className="flex flex-col items-center justify-center rounded-2xl border border-game-border bg-game-bg p-3 shadow-xs">
             <Calendar
@@ -354,7 +544,7 @@ export function DailyCalendarDialog({
           <div className="text-xs text-game-text-muted">
             Total concluídos:{" "}
             <span className="font-bold text-game-text">
-              {Object.keys(historyMap).length} dias
+              {streakInfo.totalCompleted} dias
             </span>
           </div>
 
@@ -370,3 +560,4 @@ export function DailyCalendarDialog({
     </div>
   );
 }
+

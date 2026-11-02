@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { GameTheme, GameThemeOption, PersonalStats } from "@/types/game";
 import { Palette, Check, Lock } from "lucide-react";
 import { getLocalHistory, computeStatsFromHistory } from "@/lib/stats";
+import { calculateStreak, getLocalDailyHistory } from "@/lib/daily";
 
 export const THEMES: GameThemeOption[] = [
   {
@@ -52,13 +53,41 @@ export const THEMES: GameThemeOption[] = [
       description: "Desbloqueie atingindo 10.000 pontos",
     },
   },
+  {
+    id: "inferno",
+    name: "Inferno",
+    description: "Lava incandescente e brasas vulcânicas",
+    previewColors: ["#1c0808", "#ff3d00", "#ffea00"],
+    condition: {
+      type: "daily_streak",
+      value: 7,
+      description: "Desbloqueie com 7 dias seguidos no Desafio Diário",
+    },
+  },
+  {
+    id: "cosmos",
+    name: "Cosmos",
+    description: "Nebulosa estrelada e ultravioleta cósmico",
+    previewColors: ["#0b071a", "#818cf8", "#38bdf8"],
+    condition: {
+      type: "daily_streak",
+      value: 14,
+      description: "Desbloqueie com 14 dias seguidos no Desafio Diário",
+    },
+  },
 ];
 
 export function isThemeUnlocked(
   theme: GameThemeOption,
-  stats: PersonalStats | null
+  stats: PersonalStats | null,
+  streakDays: number = 0
 ): boolean {
   if (!theme.condition) return true;
+
+  if (theme.condition.type === "daily_streak") {
+    return streakDays >= Number(theme.condition.value);
+  }
+
   if (!stats) return false;
 
   if (theme.condition.type === "tile") {
@@ -85,19 +114,24 @@ export function ThemePicker({
   compact = false,
 }: ThemePickerProps) {
   const [stats, setStats] = useState<PersonalStats | null>(null);
+  const [streakDays, setStreakDays] = useState<number>(0);
   const [lockedNotice, setLockedNotice] = useState<string | null>(null);
 
   useEffect(() => {
     try {
       const history = getLocalHistory();
       setStats(computeStatsFromHistory(history));
+
+      const dailyHistory = getLocalDailyHistory();
+      const streakInfo = calculateStreak(dailyHistory.map((d) => d.date));
+      setStreakDays(streakInfo.bestStreak);
     } catch {
       // ignore
     }
   }, []);
 
   const handleSelect = (theme: GameThemeOption) => {
-    const unlocked = isThemeUnlocked(theme, stats);
+    const unlocked = isThemeUnlocked(theme, stats, streakDays);
     if (!unlocked) {
       setLockedNotice(
         theme.condition?.description || "Bloqueado: cumpra os requisitos do jogo para liberar!"
@@ -116,7 +150,7 @@ export function ThemePicker({
         <div className="flex gap-1">
           {THEMES.map((t) => {
             const isActive = t.id === currentTheme;
-            const unlocked = isThemeUnlocked(t, stats);
+            const unlocked = isThemeUnlocked(t, stats, streakDays);
             return (
               <button
                 key={t.id}
@@ -168,7 +202,7 @@ export function ThemePicker({
       <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
         {THEMES.map((theme) => {
           const isActive = theme.id === currentTheme;
-          const unlocked = isThemeUnlocked(theme, stats);
+          const unlocked = isThemeUnlocked(theme, stats, streakDays);
 
           return (
             <button

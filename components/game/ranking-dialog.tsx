@@ -263,9 +263,28 @@ export function RankingDialog({
                             className="h-6 w-6 rounded-full border border-game-border shrink-0"
                           />
                           <div className="flex flex-col min-w-0">
-                            <span className="truncate font-bold text-game-text">
-                              {entry.displayName || `@${entry.username}`}
-                            </span>
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span className="truncate font-bold text-game-text">
+                                {entry.displayName || `@${entry.username}`}
+                              </span>
+                              {entry.streak && entry.streak > 0 ? (
+                                <span
+                                  title={`Sequência diária: ${entry.streak} dias (${entry.title || "Novato"})`}
+                                  className={`inline-flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-0.2 text-[9px] font-black ${
+                                    entry.flameTier === "gold"
+                                      ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/40"
+                                      : entry.flameTier === "purple"
+                                      ? "bg-purple-500/20 text-purple-400 border border-purple-500/40"
+                                      : entry.flameTier === "blue"
+                                      ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/40"
+                                      : "bg-amber-500/20 text-amber-500 border border-amber-500/40"
+                                  }`}
+                                >
+                                  <Flame className="h-2.5 w-2.5 fill-current" />
+                                  <span>{entry.streak}</span>
+                                </span>
+                              ) : null}
+                            </div>
                             <span className="text-[10px] text-game-text-muted">
                               Maior Bloco: {entry.highestTile}
                             </span>
@@ -336,15 +355,34 @@ export function RankingDialog({
                             className="h-6 w-6 rounded-full border border-game-border shrink-0"
                           />
                           <div className="flex flex-col min-w-0">
-                            <a
-                              href={entry.githubProfileUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="truncate font-bold text-game-text hover:text-game-accent hover:underline flex items-center gap-1"
-                            >
-                              <span>{entry.displayName || `@${entry.username}`}</span>
-                              <ExternalLink className="h-2.5 w-2.5 opacity-60" />
-                            </a>
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <a
+                                href={entry.githubProfileUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="truncate font-bold text-game-text hover:text-game-accent hover:underline flex items-center gap-1"
+                              >
+                                <span>{entry.displayName || `@${entry.username}`}</span>
+                                <ExternalLink className="h-2.5 w-2.5 opacity-60" />
+                              </a>
+                              {entry.streak && entry.streak > 0 ? (
+                                <span
+                                  title={`Sequência diária: ${entry.streak} dias (${entry.title || "Novato"})`}
+                                  className={`inline-flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-0.2 text-[9px] font-black ${
+                                    entry.flameTier === "gold"
+                                      ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/40"
+                                      : entry.flameTier === "purple"
+                                      ? "bg-purple-500/20 text-purple-400 border border-purple-500/40"
+                                      : entry.flameTier === "blue"
+                                      ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/40"
+                                      : "bg-amber-500/20 text-amber-500 border border-amber-500/40"
+                                  }`}
+                                >
+                                  <Flame className="h-2.5 w-2.5 fill-current" />
+                                  <span>{entry.streak}</span>
+                                </span>
+                              ) : null}
+                            </div>
                             <span className="text-[10px] text-game-text-muted">
                               Bloco: {entry.highestTile} • {formatDate(entry.updatedAt)}
                             </span>
