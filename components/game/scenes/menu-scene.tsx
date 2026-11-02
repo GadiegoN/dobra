@@ -253,12 +253,12 @@ export function MenuScene({
             <Calendar className="h-5 w-5" />
           </div>
           <div>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
               <span className="text-xs font-black text-game-text">Desafio Diário</span>
               {streakInfo && streakInfo.currentStreak > 0 && (
                 <span
-                  title={`Sequência ativa: ${streakInfo.currentStreak} dias (${streakInfo.title})`}
-                  className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-black ${
+                  title={`Sequência ativa: ${streakInfo.currentStreak} dias • Título: ${streakInfo.title}`}
+                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black ${
                     streakInfo.flameTier === "gold"
                       ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/40 animate-pulse"
                       : streakInfo.flameTier === "purple"
@@ -269,7 +269,8 @@ export function MenuScene({
                   }`}
                 >
                   <Flame className="h-2.5 w-2.5 fill-current" />
-                  <span>{streakInfo.currentStreak}</span>
+                  <span>{streakInfo.currentStreak}d</span>
+                  <span className="font-semibold opacity-90">• {streakInfo.title}</span>
                 </span>
               )}
             </div>

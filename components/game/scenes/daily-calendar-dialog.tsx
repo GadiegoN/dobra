@@ -1,10 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { Calendar } from "@/components/ui/calendar";
-import { ptBR } from "date-fns/locale";
 import {
-  Calendar as CalendarIcon,
   X,
   Trophy,
   Flame,
@@ -12,6 +9,7 @@ import {
   Sparkles,
   Play,
   CheckCircle2,
+  Award,
 } from "lucide-react";
 import { DailyChallengeResult, PlayerProfile, FlameTier, StreakInfo } from "@/types/game";
 import {
@@ -72,6 +70,8 @@ const FLAME_TIER_STYLES: Record<
   },
 };
 
+const DAY_LABELS = ["D", "S", "T", "Q", "Q", "S", "S"];
+
 export function DailyCalendarDialog({
   isOpen,
   onClose,
@@ -79,7 +79,7 @@ export function DailyCalendarDialog({
   onStartDailyChallenge,
 }: DailyCalendarDialogProps) {
   const [historyMap, setHistoryMap] = useState<Record<string, StoredDailyRecord>>({});
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [selectedDateStr, setSelectedDateStr] = useState<string>(getDailyDate());
   const [isLoading, setIsLoading] = useState(false);
   const [dayRanking, setDayRanking] = useState<DailyChallengeResult[]>([]);
   const [isLoadingDayRanking, setIsLoadingDayRanking] = useState(false);
@@ -93,6 +93,7 @@ export function DailyCalendarDialog({
     if (!isOpen) return;
 
     setStreakFreeze(getLocalStreakFreeze());
+    setSelectedDateStr(getDailyDate());
 
     // 1. Initial load from localStorage
     const local = getLocalDailyHistory();
@@ -135,40 +136,68 @@ export function DailyCalendarDialog({
 
   const flameStyle = FLAME_TIER_STYLES[streakInfo.flameTier];
 
-  // Played dates for calendar modifier
-  const playedDates = useMemo(() => {
-    return Object.keys(historyMap).map((dateStr) => {
-      const [year, month, day] = dateStr.split("-").map(Number);
-      return new Date(year, month - 1, day);
-    });
-  }, [historyMap]);
+  // 14-week Activity Heatmap (GitHub-style 7x14 grid)
+  const heatmapData = useMemo(() => {
+    const todayDays = dateStringToDays(todayStr);
+    const todayDate = new Date(todayDays * 86400000);
+    const todayDayOfWeek = todayDate.getUTCDay(); // 0 is Sunday, 6 is Saturday
 
-  // Selected date formatted as YYYY-MM-DD
-  const selectedDateStr = useMemo(() => {
-    if (!selectedDate) return getDailyDate();
-    const year = selectedDate.getFullYear();
-    const month = String(selectedDate.getMonth() + 1).padStart(2, "0");
-    const day = String(selectedDate.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  }, [selectedDate]);
+    const numWeeks = 14;
+    // Align start so that current week ends at the current column
+    const startDays = todayDays - todayDayOfWeek - (numWeeks - 1) * 7;
+
+    const weeks: Array<{
+      monthLabel?: string;
+      days: Array<{
+        dateStr: string;
+        played: boolean;
+        isToday: boolean;
+        isSelected: boolean;
+        isFuture: boolean;
+        dayOfWeek: number;
+        dayOfMonth: number;
+      }>;
+    }> = [];
+
+    let lastMonth = -1;
+
+    for (let w = 0; w < numWeeks; w++) {
+      const days = [];
+      let weekMonthLabel: string | undefined = undefined;
+
+      for (let d = 0; d < 7; d++) {
+        const currentDays = startDays + w * 7 + d;
+        const dStr = daysToDateString(currentDays);
+        const cellDate = new Date(currentDays * 86400000);
+        const cellMonth = cellDate.getUTCMonth();
+        const isFuture = currentDays > todayDays;
+
+        if (cellMonth !== lastMonth && d === 0) {
+          weekMonthLabel = cellDate
+            .toLocaleDateString("pt-BR", { month: "short", timeZone: "UTC" })
+            .replace(".", "")
+            .slice(0, 3);
+          lastMonth = cellMonth;
+        }
+
+        days.push({
+          dateStr: dStr,
+          played: Boolean(historyMap[dStr]),
+          isToday: dStr === todayStr,
+          isSelected: dStr === selectedDateStr,
+          isFuture,
+          dayOfWeek: d,
+          dayOfMonth: cellDate.getUTCDate(),
+        });
+      }
+
+      weeks.push({ monthLabel: weekMonthLabel, days });
+    }
+
+    return weeks;
+  }, [historyMap, todayStr, selectedDateStr]);
 
   const selectedRecord = historyMap[selectedDateStr];
-
-  // 10-week activity heatmap (70 days)
-  const heatmapDays = useMemo(() => {
-    const list: Array<{ dateStr: string; played: boolean; isToday: boolean; isSelected: boolean }> = [];
-    const todayDays = dateStringToDays(todayStr);
-    for (let i = 69; i >= 0; i--) {
-      const dStr = daysToDateString(todayDays - i);
-      list.push({
-        dateStr: dStr,
-        played: Boolean(historyMap[dStr]),
-        isToday: dStr === todayStr,
-        isSelected: dStr === selectedDateStr,
-      });
-    }
-    return list;
-  }, [historyMap, todayStr, selectedDateStr]);
 
   // Fetch ranking for selected date when requested
   useEffect(() => {
@@ -193,16 +222,18 @@ export function DailyCalendarDialog({
     return `${mins}m ${secs.toString().padStart(2, "0")}s`;
   };
 
-  const formatFullDate = (d: Date) => {
+  const formatFullDate = (dStr: string) => {
     try {
-      return d.toLocaleDateString("pt-BR", {
+      const [y, m, d] = dStr.split("-").map(Number);
+      const date = new Date(y, m - 1, d);
+      return date.toLocaleDateString("pt-BR", {
         weekday: "long",
         day: "numeric",
         month: "long",
         year: "numeric",
       });
     } catch {
-      return selectedDateStr;
+      return dStr;
     }
   };
 
@@ -216,18 +247,22 @@ export function DailyCalendarDialog({
         {/* Header */}
         <div className="mb-3 flex items-center justify-between border-b border-game-border pb-3">
           <div className="flex items-center gap-2.5">
-            <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${flameStyle.bg} ${flameStyle.text} border ${flameStyle.border} ${flameStyle.glow}`}>
+            <div
+              className={`flex h-9 w-9 items-center justify-center rounded-xl ${flameStyle.bg} ${flameStyle.text} border ${flameStyle.border} ${flameStyle.glow}`}
+            >
               <Flame className={`h-5 w-5 ${flameStyle.fill}`} />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base font-black text-game-text">Desafios & Sequência</h2>
-                <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${flameStyle.bg} ${flameStyle.text} border ${flameStyle.border}`}>
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${flameStyle.bg} ${flameStyle.text} border ${flameStyle.border}`}
+                >
                   {streakInfo.title}
                 </span>
               </div>
               <p className="text-xs text-game-text-muted">
-                Mantenha a chama acesa todos os dias para desbloquear bônus e temas
+                Histórico de atividade, sequência de vitórias e recordes
               </p>
             </div>
           </div>
@@ -242,9 +277,12 @@ export function DailyCalendarDialog({
         </div>
 
         {/* Scrollable Container */}
-        <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+        <div className="flex-1 overflow-y-auto space-y-3.5 pr-1">
           {/* Top Streak Gamification KPI Banner */}
-          <div className={`rounded-2xl border ${flameStyle.border} ${flameStyle.bg} p-3.5 flex flex-col gap-2.5 shadow-xs`}>
+          <div
+            className={`rounded-2xl border ${flameStyle.border} ${flameStyle.bg} p-3.5 flex flex-col gap-2.5 shadow-xs`}
+          >
+            {/* Top row: Streak + Best Streak + Shield */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-1.5">
@@ -287,7 +325,36 @@ export function DailyCalendarDialog({
               </div>
             </div>
 
-            {/* Streak Multiplier & Theme Progress Bar */}
+            {/* Middle row: Prominent Honorary Title Banner */}
+            <div className="flex items-center justify-between rounded-xl bg-game-bg/70 px-3 py-2 border border-game-border/60 shadow-2xs">
+              <div className="flex items-center gap-2">
+                <Award className="h-4 w-4 text-amber-400 shrink-0" />
+                <span className="text-[11px] font-bold text-game-text-muted">Título Honorário:</span>
+                <span
+                  className={`rounded-md px-2 py-0.5 text-xs font-black uppercase tracking-wide ${flameStyle.bg} ${flameStyle.text} border ${flameStyle.border}`}
+                >
+                  {streakInfo.title}
+                </span>
+              </div>
+              <div className="text-[10px] font-semibold text-game-text-muted">
+                {streakInfo.currentStreak < 3 ? (
+                  <span>
+                    Falta {3 - streakInfo.currentStreak}{" "}
+                    {3 - streakInfo.currentStreak === 1 ? "dia" : "dias"} p/ Iniciado
+                  </span>
+                ) : streakInfo.currentStreak < 7 ? (
+                  <span>Faltam {7 - streakInfo.currentStreak} dias p/ Semana Perfeita</span>
+                ) : streakInfo.currentStreak < 14 ? (
+                  <span>Faltam {14 - streakInfo.currentStreak} dias p/ Disciplinado</span>
+                ) : streakInfo.currentStreak < 30 ? (
+                  <span>Faltam {30 - streakInfo.currentStreak} dias p/ Mestre</span>
+                ) : (
+                  <span className="text-amber-400 font-bold">Grau Máximo Conquistado!</span>
+                )}
+              </div>
+            </div>
+
+            {/* Bottom row: Multiplier & Theme Progress Bar */}
             <div className="flex flex-wrap items-center justify-between gap-1 border-t border-game-border/40 pt-2 text-[11px]">
               <div className="flex items-center gap-1.5 text-game-text">
                 <Sparkles className="h-3.5 w-3.5 text-amber-400" />
@@ -304,85 +371,84 @@ export function DailyCalendarDialog({
                 ) : streakInfo.currentStreak < 14 ? (
                   <span>Faltam {14 - streakInfo.currentStreak} dias p/ Tema Cosmos 🌌</span>
                 ) : (
-                  <span className="text-purple-400">Todos os temas de sequência liberados! 🌟</span>
+                  <span className="text-purple-400">Todos os temas liberados! 🌟</span>
                 )}
               </div>
             </div>
           </div>
 
-          {/* Activity Heatmap Grid (Last 10 Weeks) */}
-          <div className="rounded-2xl border border-game-border bg-game-bg p-3 shadow-xs">
-            <div className="mb-2 flex items-center justify-between">
-              <span className="text-[11px] font-black uppercase tracking-wider text-game-text">
-                Frequência de Atividade (Últimas 10 semanas)
+          {/* Activity Heatmap Grid (GitHub style) - Centerpiece */}
+          <div className="rounded-2xl border border-game-border bg-game-bg p-3.5 shadow-xs">
+            <div className="mb-2.5 flex items-center justify-between">
+              <span className="text-xs font-black uppercase tracking-wider text-game-text">
+                Frequência de Atividade (Últimas 14 semanas)
               </span>
-              <span className="text-[10px] text-game-text-muted">
+              <span className="text-[11px] font-bold text-game-text-muted">
                 {streakInfo.totalCompleted} desafios concluídos
               </span>
             </div>
 
-            <div className="flex items-center justify-center overflow-x-auto py-1">
-              <div className="grid grid-flow-col grid-rows-7 gap-1">
-                {heatmapDays.map((cell) => (
-                  <button
-                    key={cell.dateStr}
-                    type="button"
-                    title={`${cell.dateStr}: ${cell.played ? "Concluído" : "Não jogado"}`}
-                    onClick={() => {
-                      const [y, m, d] = cell.dateStr.split("-").map(Number);
-                      setSelectedDate(new Date(y, m - 1, d));
-                      setShowRanking(false);
-                    }}
-                    className={`h-3 w-3 rounded-xs transition-all ${
-                      cell.played
-                        ? "bg-purple-600 hover:bg-purple-500 shadow-xs"
-                        : "bg-game-border/40 hover:bg-game-border"
-                    } ${cell.isSelected ? "ring-2 ring-game-accent ring-offset-1 ring-offset-game-bg scale-125 z-10" : ""} ${
-                      cell.isToday && !cell.isSelected ? "border border-game-accent" : ""
-                    }`}
-                  />
-                ))}
+            {/* Heatmap Grid with Weekday Labels */}
+            <div className="flex justify-center overflow-x-auto py-1">
+              <div className="flex gap-1.5">
+                {/* Weekday indicators on left */}
+                <div className="flex flex-col justify-between py-0.5 text-[9px] font-bold text-game-text-muted select-none">
+                  {DAY_LABELS.map((label, idx) => (
+                    <span key={idx} className="h-3 leading-3 w-2.5 text-center">
+                      {idx % 2 === 1 ? label : ""}
+                    </span>
+                  ))}
+                </div>
+
+                {/* Weeks columns */}
+                <div className="flex gap-1">
+                  {heatmapData.map((week, wIdx) => (
+                    <div key={wIdx} className="flex flex-col gap-1">
+                      {week.days.map((cell) => (
+                        <button
+                          key={cell.dateStr}
+                          type="button"
+                          disabled={cell.isFuture}
+                          title={`${cell.dateStr}: ${
+                            cell.isFuture
+                              ? "Data futura"
+                              : cell.played
+                              ? "Desafio Concluído ✓"
+                              : "Não jogado"
+                          }`}
+                          onClick={() => {
+                            if (!cell.isFuture) {
+                              setSelectedDateStr(cell.dateStr);
+                              setShowRanking(false);
+                            }
+                          }}
+                          className={`h-3 w-3 rounded-xs transition-all ${
+                            cell.isFuture
+                              ? "opacity-15 bg-game-border cursor-not-allowed"
+                              : cell.played
+                              ? "bg-purple-600 hover:bg-purple-500 shadow-xs cursor-pointer"
+                              : "bg-game-border/50 hover:bg-game-border cursor-pointer"
+                          } ${
+                            cell.isSelected
+                              ? "ring-2 ring-game-accent ring-offset-1 ring-offset-game-bg scale-125 z-10"
+                              : ""
+                          } ${cell.isToday && !cell.isSelected ? "border border-game-accent" : ""}`}
+                        />
+                      ))}
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
-            <div className="mt-2 flex items-center justify-end gap-2 text-[10px] text-game-text-muted">
-              <span>Menos</span>
-              <span className="h-2.5 w-2.5 rounded-xs bg-game-border/40" />
-              <span className="h-2.5 w-2.5 rounded-xs bg-purple-600" />
-              <span>Mais</span>
-            </div>
-          </div>
 
-          {/* Calendar Picker */}
-          <div className="flex flex-col items-center justify-center rounded-2xl border border-game-border bg-game-bg p-3 shadow-xs">
-            <Calendar
-              mode="single"
-              selected={selectedDate}
-              onSelect={(date) => {
-                if (date) {
-                  setSelectedDate(date);
-                  setShowRanking(false);
-                }
-              }}
-              locale={ptBR}
-              modifiers={{
-                played: playedDates,
-              }}
-              modifiersClassNames={{
-                played:
-                  "!bg-purple-600 !text-white font-black hover:!bg-purple-700 !rounded-full shadow-xs",
-              }}
-              className="rounded-xl"
-            />
-
-            {/* Legend */}
-            <div className="mt-2 flex items-center justify-center gap-4 text-[11px] text-game-text-muted border-t border-game-border/50 pt-2 w-full">
+            {/* Heatmap Footer Legend */}
+            <div className="mt-2.5 flex items-center justify-between border-t border-game-border/50 pt-2 text-[10px] text-game-text-muted">
+              <span>Clique em qualquer quadrado para inspecionar</span>
               <div className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-full bg-purple-600 shadow-xs" />
-                <span>Desafio Concluído</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-full border-2 border-game-accent bg-transparent" />
-                <span>Selecionado</span>
+                <span>Menos</span>
+                <span className="h-2.5 w-2.5 rounded-xs bg-game-border/50" />
+                <span className="h-2.5 w-2.5 rounded-xs bg-purple-600" />
+                <span>Mais</span>
               </div>
             </div>
           </div>
@@ -391,7 +457,7 @@ export function DailyCalendarDialog({
           <div className="rounded-2xl border border-game-border bg-game-bg/60 p-4 shadow-xs">
             <div className="mb-2 flex items-center justify-between">
               <span className="text-xs font-black uppercase tracking-wider text-game-text-muted capitalize">
-                {formatFullDate(selectedDate)}
+                {formatFullDate(selectedDateStr)}
               </span>
 
               {selectedRecord ? (
@@ -457,10 +523,14 @@ export function DailyCalendarDialog({
                   <button
                     type="button"
                     onClick={() => setShowRanking(!showRanking)}
-                    className="flex items-center gap-1.5 text-xs font-bold text-game-accent hover:underline"
+                    className="flex items-center gap-1.5 text-xs font-bold text-game-accent hover:underline cursor-pointer"
                   >
                     <Trophy className="h-3.5 w-3.5" />
-                    <span>{showRanking ? "Ocultar ranking do dia" : "Ver ranking de jogadores deste dia"}</span>
+                    <span>
+                      {showRanking
+                        ? "Ocultar ranking do dia"
+                        : "Ver ranking de jogadores deste dia"}
+                    </span>
                   </button>
 
                   {showRanking && (
@@ -521,7 +591,7 @@ export function DailyCalendarDialog({
                     onClose();
                     onStartDailyChallenge();
                   }}
-                  className="flex items-center gap-2 rounded-xl bg-purple-600 px-4 py-2 text-xs font-black text-white hover:bg-purple-700 transition-colors shadow-sm"
+                  className="flex items-center gap-2 rounded-xl bg-purple-600 px-4 py-2 text-xs font-black text-white hover:bg-purple-700 transition-colors shadow-sm cursor-pointer"
                 >
                   <Play className="h-4 w-4 fill-current" />
                   <span>Jogar Desafio de Hoje</span>
@@ -551,7 +621,7 @@ export function DailyCalendarDialog({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl bg-game-accent px-4 py-2 text-xs font-black text-game-accent-text hover:bg-game-accent-hover transition-colors"
+            className="rounded-xl bg-game-accent px-4 py-2 text-xs font-black text-game-accent-text hover:bg-game-accent-hover transition-colors cursor-pointer"
           >
             Fechar
           </button>
@@ -560,4 +630,3 @@ export function DailyCalendarDialog({
     </div>
   );
 }
-
