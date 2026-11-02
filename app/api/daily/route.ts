@@ -158,10 +158,24 @@ export async function GET(request: NextRequest) {
       }));
     }
 
-    const freezeParam = searchParams.get("freeze") === "true";
+    let freezeAvailable = searchParams.get("freeze") === "true";
+    if (player) {
+      try {
+        const lbRows = (await sql`
+          SELECT score, highest_tile FROM leaderboard WHERE github_id = ${player.githubId} LIMIT 1;
+        `) as unknown as Array<{ score: number; highest_tile: number }>;
+
+        if (lbRows.length > 0 && (lbRows[0].highest_tile >= 2048 || lbRows[0].score >= 2048)) {
+          freezeAvailable = true;
+        }
+      } catch (err) {
+        console.error("Error checking leaderboard for streak freeze:", err);
+      }
+    }
+
     const streakInfo = calculateStreak(
       userHistory.map((h) => h.date),
-      freezeParam,
+      freezeAvailable,
       getDailyDate()
     );
 

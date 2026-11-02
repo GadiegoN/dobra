@@ -169,6 +169,9 @@ export default function GameScreen() {
         const data = await res.json();
         setDailyPlayed(Boolean(data.hasPlayed));
         if (data.streakInfo) {
+          if (data.streakInfo.streakFreezeAvailable) {
+            saveLocalStreakFreeze(true);
+          }
           setStreakInfo(data.streakInfo);
           return;
         }
@@ -345,6 +348,9 @@ export default function GameScreen() {
       
       if (modeRef.current === "classic") {
         syncScoreToGlobal(finalScore, highest, totalMoves);
+        if (highest >= 2048 || finalScore >= 2048) {
+          saveLocalStreakFreeze(true);
+        }
       }
 
       // Record any legitimate game mode score to current weekly season
@@ -573,9 +579,11 @@ export default function GameScreen() {
         setHasAcknowledgedWin(true);
         setIsWinDialogOpen(true);
         soundManager.playWin();
-        if (modeRef.current === "classic") {
-          saveLocalStreakFreeze(true);
-        }
+      }
+
+      // Streak Freeze Shield award (reached 2048 tile OR score >= 2048 in classic mode)
+      if (modeRef.current === "classic" && (currentHighest >= 2048 || newScore >= 2048)) {
+        saveLocalStreakFreeze(true);
       }
 
       // 7. Game Over check

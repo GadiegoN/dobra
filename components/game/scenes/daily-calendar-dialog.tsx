@@ -18,6 +18,7 @@ import {
   StoredDailyRecord,
   calculateStreak,
   getLocalStreakFreeze,
+  saveLocalStreakFreeze,
   dateStringToDays,
   daysToDateString,
 } from "@/lib/daily";
@@ -109,6 +110,10 @@ export function DailyCalendarDialog({
     fetch(`/api/daily?freeze=${freezeAvail}`)
       .then((res) => res.json())
       .then((data) => {
+        if (data?.streakInfo?.streakFreezeAvailable) {
+          setStreakFreeze(true);
+          saveLocalStreakFreeze(true);
+        }
         if (data?.userHistory && Array.isArray(data.userHistory)) {
           for (const item of data.userHistory) {
             map[item.date] = {
