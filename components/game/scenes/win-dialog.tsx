@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import confetti from "canvas-confetti";
-import { Sparkles, Trophy, ArrowRight, Play } from "lucide-react";
+import { Sparkles, Trophy, ArrowRight, Play, Shield } from "lucide-react";
 
 interface WinDialogProps {
   isOpen: boolean;
@@ -90,6 +90,19 @@ export function WinDialog({
           </strong>
           . Agora você pode continuar e tentar alcançar o 4096!
         </p>
+
+        {/* Streak Freeze Shield Reward */}
+        <div className="mt-3 flex items-center gap-2.5 rounded-2xl border border-blue-500/30 bg-blue-500/10 p-2.5 text-left text-xs">
+          <Shield className="h-5 w-5 text-blue-400 shrink-0 fill-blue-400/20" />
+          <div>
+            <span className="block font-black text-game-text text-[11px]">
+              Escudo de Sequência Ativado! 🛡️
+            </span>
+            <span className="text-[10px] text-game-text-muted leading-tight">
+              Protege 1 dia de falta na sua sequência do Desafio Diário.
+            </span>
+          </div>
+        </div>
 
         {/* Action Buttons */}
         <div className="mt-6 flex w-full flex-col gap-2.5">
