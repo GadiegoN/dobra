@@ -33,12 +33,13 @@ import {
   isScoreEligibleForRanking,
 } from "@/lib/storage";
 import { saveLocalMatch } from "@/lib/stats";
-import { getDailyConfig, getDailyDate } from "@/lib/daily";
+import { getDailyConfig, getDailyDate, saveLocalDailyResult } from "@/lib/daily";
 import { MenuScene } from "./scenes/menu-scene";
 import { PlayScene } from "./scenes/play-scene";
 import { GameOverScene } from "./scenes/game-over-scene";
 import { RankingDialog } from "./ranking-dialog";
 import { StatsDialog } from "./scenes/stats-dialog";
+import { DailyCalendarDialog } from "./scenes/daily-calendar-dialog";
 import { WinDialog } from "./scenes/win-dialog";
 import { soundManager } from "@/lib/audio";
 
@@ -55,6 +56,7 @@ export default function GameScreen() {
   const [isLoadingGlobal, setIsLoadingGlobal] = useState(false);
   const [isRankingOpen, setIsRankingOpen] = useState(false);
   const [isStatsOpen, setIsStatsOpen] = useState(false);
+  const [isDailyCalendarOpen, setIsDailyCalendarOpen] = useState(false);
   const [hasGameInProgress, setHasGameInProgress] = useState(false);
   const [isNewBest, setIsNewBest] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -252,11 +254,22 @@ export default function GameScreen() {
         1,
         Math.round((Date.now() - gameStartTimeRef.current) / 1000)
       );
+      const dateStr = getDailyDate();
+      saveLocalDailyResult({
+        id: "daily_" + dateStr,
+        date: dateStr,
+        score: scoreRef.current,
+        highestTile: getHighestTile(boardRef.current),
+        movesCount: movesCountRef.current,
+        durationSeconds,
+        createdAt: new Date().toISOString(),
+      });
+
       await fetch("/api/daily", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          date: getDailyDate(),
+          date: dateStr,
           moves: movesLogRef.current,
           durationSeconds,
         }),
@@ -603,6 +616,7 @@ export default function GameScreen() {
             }}
             onOpenRanking={() => setIsRankingOpen(true)}
             onOpenStats={() => setIsStatsOpen(true)}
+            onOpenDailyCalendar={() => setIsDailyCalendarOpen(true)}
             onStartDailyChallenge={handleStartDailyChallenge}
             dailyPlayed={dailyPlayed}
             friendChallenge={friendChallenge}
@@ -683,6 +697,17 @@ export default function GameScreen() {
         isOpen={isStatsOpen}
         onClose={() => setIsStatsOpen(false)}
         player={player}
+      />
+
+      {/* Daily Challenge Calendar Dialog */}
+      <DailyCalendarDialog
+        isOpen={isDailyCalendarOpen}
+        onClose={() => setIsDailyCalendarOpen(false)}
+        player={player}
+        onStartDailyChallenge={() => {
+          setIsDailyCalendarOpen(false);
+          handleStartDailyChallenge();
+        }}
       />
 
       {/* 2048 Victory Celebration Dialog */}

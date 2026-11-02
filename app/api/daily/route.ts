@@ -66,6 +66,7 @@ export async function GET(request: NextRequest) {
 
     let hasPlayed = false;
     let userResult: DailyChallengeResult | null = null;
+    let userHistory: DailyChallengeResult[] = [];
 
     if (player) {
       const match = ranking.find((r) => r.githubId === player.githubId);
@@ -109,6 +110,52 @@ export async function GET(request: NextRequest) {
           };
         }
       }
+
+      // Fetch all historical daily attempts for this player
+      const historyRows = (await sql`
+        SELECT 
+          id,
+          to_char(challenge_date, 'YYYY-MM-DD') as challenge_date_str,
+          github_id,
+          username,
+          display_name,
+          avatar_url,
+          score,
+          highest_tile,
+          moves_count,
+          duration_seconds,
+          created_at
+        FROM daily_challenge_results
+        WHERE github_id = ${player.githubId}
+        ORDER BY challenge_date DESC
+        LIMIT 100;
+      `) as unknown as Array<{
+        id: string;
+        challenge_date_str: string;
+        github_id: string | null;
+        username: string;
+        display_name: string | null;
+        avatar_url: string | null;
+        score: number;
+        highest_tile: number;
+        moves_count: number;
+        duration_seconds: number;
+        created_at: string | Date;
+      }>;
+
+      userHistory = historyRows.map((r) => ({
+        id: String(r.id),
+        date: String(r.challenge_date_str),
+        githubId: r.github_id ? String(r.github_id) : undefined,
+        username: String(r.username),
+        displayName: r.display_name ? String(r.display_name) : null,
+        avatarUrl: r.avatar_url ? String(r.avatar_url) : undefined,
+        score: Number(r.score),
+        highestTile: Number(r.highest_tile),
+        movesCount: Number(r.moves_count),
+        durationSeconds: Number(r.duration_seconds),
+        createdAt: new Date(r.created_at).toISOString(),
+      }));
     }
 
     return NextResponse.json({
@@ -116,6 +163,7 @@ export async function GET(request: NextRequest) {
       hasPlayed,
       userResult,
       ranking,
+      userHistory,
     });
   } catch (error) {
     console.error("Error fetching daily challenge:", error);

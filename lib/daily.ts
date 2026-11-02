@@ -37,3 +37,38 @@ export function getDailyConfig(dateStr: string = getDailyDate()): DailyChallenge
     description: `Desafio Diário DOBRA • ${dateStr}`,
   };
 }
+
+const DAILY_HISTORY_KEY = "dobra_daily_history_v1";
+
+export interface StoredDailyRecord {
+  id: string;
+  date: string; // YYYY-MM-DD
+  score: number;
+  highestTile: number;
+  movesCount: number;
+  durationSeconds: number;
+  createdAt: string;
+}
+
+export function getLocalDailyHistory(): StoredDailyRecord[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(DAILY_HISTORY_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveLocalDailyResult(result: StoredDailyRecord): void {
+  if (typeof window === "undefined") return;
+  try {
+    const current = getLocalDailyHistory();
+    const updated = [result, ...current.filter((item) => item.date !== result.date)].slice(0, 365);
+    localStorage.setItem(DAILY_HISTORY_KEY, JSON.stringify(updated));
+  } catch (e) {
+    console.error("Error saving local daily result", e);
+  }
+}

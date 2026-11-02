@@ -16,6 +16,7 @@ import {
   Download,
   BarChart3,
   Calendar,
+  CalendarDays,
   Timer,
   Footprints,
   ShieldAlert,
@@ -39,6 +40,7 @@ interface MenuSceneProps {
   onNewGame: () => void;
   onOpenRanking: () => void;
   onOpenStats: () => void;
+  onOpenDailyCalendar: () => void;
   onStartDailyChallenge: () => void;
   dailyPlayed: boolean;
   friendChallenge: FriendChallenge | null;
@@ -70,6 +72,7 @@ export function MenuScene({
   onNewGame,
   onOpenRanking,
   onOpenStats,
+  onOpenDailyCalendar,
   onStartDailyChallenge,
   dailyPlayed,
   friendChallenge,
@@ -260,14 +263,25 @@ export function MenuScene({
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={onStartDailyChallenge}
-          disabled={dailyPlayed}
-          className="rounded-xl bg-purple-600 px-3 py-1.5 text-xs font-black text-white hover:bg-purple-700 disabled:opacity-40 transition-colors shadow-2xs"
-        >
-          {dailyPlayed ? "Concluído" : "Jogar Desafio"}
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={onOpenDailyCalendar}
+            title="Abrir calendário do Desafio Diário"
+            className="flex h-8 w-8 items-center justify-center rounded-xl border border-game-border bg-game-bg text-game-text-muted hover:text-purple-400 hover:border-purple-500/40 transition-colors shadow-2xs"
+          >
+            <CalendarDays className="h-4 w-4 text-purple-400" />
+          </button>
+
+          <button
+            type="button"
+            onClick={onStartDailyChallenge}
+            disabled={dailyPlayed}
+            className="rounded-xl bg-purple-600 px-3 py-1.5 text-xs font-black text-white hover:bg-purple-700 disabled:opacity-40 transition-colors shadow-2xs"
+          >
+            {dailyPlayed ? "Concluído" : "Jogar Desafio"}
+          </button>
+        </div>
       </div>
 
       {/* Main Action Buttons */}

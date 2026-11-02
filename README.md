@@ -15,10 +15,11 @@ Repositório oficial: [https://github.com/GadiegoN/dobra](https://github.com/Gad
 - **Sobrevivência**: Uma nova peça aleatória surge a cada 3 segundos, desafiando o jogador a agir sob pressão contínua.
 - **Modo Alvo**: Desafio com meta de alcançar o bloco 1024 no menor número de movimentos, com vitória instantânea ao atingir o objetivo.
 
-### 2. Desafio Diário Determinístico
+### 2. Desafio Diário Determinístico & Calendário de Participação
 - Todos os jogadores no mundo recebem o mesmo tabuleiro inicial e a mesma sequência de peças a cada dia.
-- Semente calculada com base na data UTC (`YYYY-MM-DD`).
+- Semente e virada calculadas rigorosamente no **Horário de Brasília (`America/Sao_Paulo`, UTC-3)** às 00:00:00.
 - Limite estrito de uma tentativa diária validada no servidor.
+- **Calendário Interativo**: visualização dos dias jogados no mês, com destaque visual e detalhamento da partida (pontos, maior peça, movimentos, duração e ranking do dia selecionado).
 - Ranking diário dedicado com desempate por tempo e menor número de movimentos.
 
 ### 3. Temporadas Competitivas
