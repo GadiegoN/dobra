@@ -209,12 +209,12 @@ export function validateGameDuration(
     return { valid: false, reason: "Partida rápida demais para ser humana (< 0.5s)" };
   }
 
-  if (durationMs > 1000 * 60 * 60 * 48) {
-    return { valid: false, reason: "Sessão de partida expirada (> 48h)" };
+  if (durationMs > 1000 * 60 * 60 * 24 * 7) {
+    return { valid: false, reason: "Sessão de partida expirada (> 7 dias)" };
   }
 
   if (score >= 1000) {
-    const minEstimatedMoves = Math.floor(score / 45);
+    const minEstimatedMoves = Math.floor(score / 60);
     if (movesCount > 0 && movesCount < minEstimatedMoves) {
       return {
         valid: false,

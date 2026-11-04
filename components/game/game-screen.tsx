@@ -266,13 +266,6 @@ export default function GameScreen() {
           setGlobalSynced(true);
           fetchGlobalRanking();
         }
-
-        // Also record to current season
-        fetch("/api/seasons", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ score: finalScore, highestTile: highest }),
-        }).catch(() => {});
       } catch (err) {
         console.error("Failed to sync score to global", err);
       }

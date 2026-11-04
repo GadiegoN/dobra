@@ -9,7 +9,6 @@ import {
   validateGameDuration,
   markSessionConsumed,
   isSessionConsumed,
-  verifyGameReplay,
 } from "@/lib/security";
 
 interface DbLeaderboardRow {
@@ -166,24 +165,6 @@ export async function POST(request: NextRequest) {
           { error: `Partida rejeitada: ${durationCheck.reason}` },
           { status: 400 }
         );
-      }
-
-      // If full moves array is sent along with seed, verify deterministic replay
-      if (moves && tokenVerification.payload.seed) {
-        const replayCheck = verifyGameReplay(
-          tokenVerification.payload.seed,
-          moves,
-          score,
-          highestTile,
-          "classic"
-        );
-        if (!replayCheck.valid) {
-          console.warn(`[Anti-Cheat] Replay mismatch for @${player.username}:`, replayCheck.reason);
-          return NextResponse.json(
-            { error: `Partida adulterada: ${replayCheck.reason}` },
-            { status: 400 }
-          );
-        }
       }
 
       // Mark token consumed to prevent replay attack

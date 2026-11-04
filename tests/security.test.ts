@@ -52,8 +52,8 @@ describe("Security & Anti-Cheat Validation", () => {
       expect(res.reason).toContain("rápida demais");
     });
 
-    it("rejects expired sessions (> 48h)", () => {
-      const longAgo = Date.now() - 1000 * 60 * 60 * 50;
+    it("rejects expired sessions (> 7 dias)", () => {
+      const longAgo = Date.now() - 1000 * 60 * 60 * 24 * 8;
       const res = validateGameDuration(longAgo, 400, 10);
       expect(res.valid).toBe(false);
       expect(res.reason).toContain("expirada");
