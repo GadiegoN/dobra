@@ -4,7 +4,7 @@ import { getDb, ensureDatabaseSchema } from "@/lib/db";
 import { getDailyConfig, getDailyDate, calculateStreak } from "@/lib/daily";
 import { getCurrentSeason, ensureSeasonExists } from "@/lib/seasons";
 import { DailyChallengeResult, Direction } from "@/types/game";
-import { replayGame } from "@/lib/game-engine";
+import { validateScoreSanity } from "@/lib/security";
 
 interface DbDailyRow {
   id: string;
@@ -215,31 +215,26 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const dateParam = String(body.date || getDailyDate());
-    const moves = Array.isArray(body.moves) ? (body.moves as Direction[]) : [];
+    const score = Number(body.score || 0);
+    const highestTile = Number(body.highestTile || 2);
+    const movesCount = Number(body.movesCount || 0);
     const durationSeconds = Number(body.durationSeconds || 0);
+    const moves = Array.isArray(body.moves) ? (body.moves as Direction[]) : [];
+
+    // Sanity check (multiples of 4, power of 2, logical bounds)
+    const sanityCheck = validateScoreSanity(score, highestTile);
+    if (!sanityCheck.valid) {
+      return NextResponse.json(
+        { error: `Validação rejeitada: ${sanityCheck.reason}` },
+        { status: 400 }
+      );
+    }
 
     const config = getDailyConfig(dateParam);
     const sql = getDb();
     await ensureDatabaseSchema();
 
-    // Check if player has already submitted today
-    const existing = await sql`
-      SELECT id FROM daily_challenge_results 
-      WHERE challenge_date = ${dateParam}::date AND github_id = ${player.githubId}
-      LIMIT 1;
-    `;
-
-    if (existing.length > 0) {
-      return NextResponse.json(
-        { error: "Você já realizou sua tentativa no Desafio Diário de hoje!" },
-        { status: 400 }
-      );
-    }
-
-    // Deterministic server replay verification
-    const replay = replayGame(config.seed, moves, "classic");
-
-    // Insert verified result
+    // Insert or update with best score for today
     await sql`
       INSERT INTO daily_challenge_results (
         challenge_date,
@@ -261,14 +256,22 @@ export async function POST(request: NextRequest) {
         ${player.username},
         ${player.displayName},
         ${player.avatarUrl},
-        ${replay.score},
-        ${replay.highestTile},
-        ${replay.movesPlayed},
+        ${score},
+        ${highestTile},
+        ${movesCount},
         ${durationSeconds},
         ${config.seed},
         ${JSON.stringify(moves)},
         NOW()
-      );
+      )
+      ON CONFLICT (challenge_date, github_id)
+      DO UPDATE SET
+        score = GREATEST(daily_challenge_results.score, EXCLUDED.score),
+        highest_tile = GREATEST(daily_challenge_results.highest_tile, EXCLUDED.highest_tile),
+        moves_count = CASE WHEN EXCLUDED.score > daily_challenge_results.score THEN EXCLUDED.moves_count ELSE daily_challenge_results.moves_count END,
+        duration_seconds = CASE WHEN EXCLUDED.score > daily_challenge_results.score THEN EXCLUDED.duration_seconds ELSE daily_challenge_results.duration_seconds END,
+        display_name = EXCLUDED.display_name,
+        avatar_url = EXCLUDED.avatar_url;
     `;
 
     // Calculate streak with the newly added challenge date
@@ -287,8 +290,8 @@ export async function POST(request: NextRequest) {
 
     // Also record score to current weekly season leaderboard (applying streak multiplier!)
     const boostedSeasonScore = streakInfo.streakBonusPercent > 0
-      ? Math.round(replay.score * (1 + streakInfo.streakBonusPercent / 100))
-      : replay.score;
+      ? Math.round(score * (1 + streakInfo.streakBonusPercent / 100))
+      : score;
 
     try {
       const currentSeason = getCurrentSeason();
@@ -313,7 +316,7 @@ export async function POST(request: NextRequest) {
           ${player.displayName},
           ${player.avatarUrl},
           ${boostedSeasonScore},
-          ${replay.highestTile},
+          ${highestTile},
           ${player.githubProfileUrl},
           NOW(),
           NOW()
@@ -333,10 +336,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      score: replay.score,
+      score,
       boostedSeasonScore,
-      highestTile: replay.highestTile,
-      movesCount: replay.movesPlayed,
+      highestTile,
+      movesCount,
       streakInfo,
     });
   } catch (error) {

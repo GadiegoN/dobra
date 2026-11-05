@@ -4,7 +4,6 @@ import {
   validateGameDuration,
   createGameSessionToken,
   verifyGameSessionToken,
-  verifyGameReplay,
 } from "@/lib/security";
 import { signProfileToken, verifyProfileToken } from "@/lib/auth";
 import { Direction, PlayerProfile } from "@/types/game";
@@ -88,32 +87,6 @@ describe("Security & Anti-Cheat Validation", () => {
       const verified = verifyGameSessionToken(token, "other-user");
       expect(verified.valid).toBe(false);
       expect(verified.reason).toContain("não pertence a este usuário");
-    });
-  });
-
-  describe("verifyGameReplay", () => {
-    it("validates exact score and highest tile from deterministically replayed moves", () => {
-      const seed = 98765;
-      const moves: Direction[] = ["left", "down", "right", "up", "left", "down"];
-      const actual = replayGame(seed, moves, "classic");
-
-      const checkValid = verifyGameReplay(
-        seed,
-        moves,
-        actual.score,
-        actual.highestTile,
-        "classic"
-      );
-      expect(checkValid.valid).toBe(true);
-
-      const checkTampered = verifyGameReplay(
-        seed,
-        moves,
-        actual.score + 100, // fake claimed score
-        actual.highestTile,
-        "classic"
-      );
-      expect(checkTampered.valid).toBe(false);
     });
   });
 

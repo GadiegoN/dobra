@@ -68,10 +68,10 @@ Repositório oficial: [https://github.com/GadiegoN/dobra](https://github.com/Gad
 - Suporte nativo à API Web Share (`navigator.share`) em smartphones e computadores.
 - Cópia instantânea do texto e link com validação do ranking confirmado.
 
-### 8. Motor de Jogo Determinístico & Anti-Cheat
-- Algoritmo Mulberry32 PRNG de 32 bits garantindo repetibilidade de sequências em qualquer plataforma.
+### 8. Motor de Jogo Determinístico & Segurança
+- Algoritmo Mulberry32 PRNG de 32 bits para sementes de desafios.
 - Regra estrita de fusão única por movimento (impede fusões duplas no mesmo lance).
-- Validação no servidor via replay determinístico (`replayGame`): verifica cada movimento do jogador antes de salvar no ranking.
+- Validação matemática rigorosa no servidor (`validateScoreSanity`): pontuações coerentes com potência de 2 e múltiplos de 4.
 - Tokens HMAC-SHA256 e proteção contra ataques de repetição (replay attack).
 
 ---

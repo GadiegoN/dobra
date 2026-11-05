@@ -107,6 +107,12 @@ export default function GameScreen() {
   const hasWonRef = useRef<boolean>(hasAcknowledgedWin);
   const sceneRef = useRef<GameScene>(scene);
   const modeRef = useRef<GameMode>(mode);
+  const playerRef = useRef<PlayerProfile | null>(player);
+  const hasSyncedDailyRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    playerRef.current = player;
+  }, [player]);
 
   useEffect(() => {
     boardRef.current = board;
@@ -169,11 +175,31 @@ export default function GameScreen() {
   const checkDailyStatus = useCallback(async () => {
     const freezeAvail = getLocalStreakFreeze();
     const today = getDailyDate();
+    const localHistory = getLocalDailyHistory();
+    const todayLocal = localHistory.find((h) => h.date === today);
+
     try {
       const res = await fetch(`/api/daily?freeze=${freezeAvail}`);
       if (res.ok) {
         const data = await res.json();
         setDailyPlayed(Boolean(data.hasPlayed));
+
+        // Auto-heal once: If local record has higher score than server, sync real score to server
+        if (!hasSyncedDailyRef.current && playerRef.current && todayLocal && (!data?.userResult || todayLocal.score > data.userResult.score)) {
+          hasSyncedDailyRef.current = true;
+          fetch("/api/daily", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              date: today,
+              score: todayLocal.score,
+              highestTile: todayLocal.highestTile,
+              movesCount: todayLocal.movesCount,
+              durationSeconds: todayLocal.durationSeconds,
+            }),
+          }).catch(() => {});
+        }
+
         if (data.streakInfo) {
           if (data.streakInfo.streakFreezeAvailable) {
             saveLocalStreakFreeze(true);
@@ -187,7 +213,6 @@ export default function GameScreen() {
     }
 
     // Fallback: calculate streak from local storage
-    const localHistory = getLocalDailyHistory();
     const localStreak = calculateStreak(
       localHistory.map((h) => h.date),
       freezeAvail,
@@ -297,8 +322,11 @@ export default function GameScreen() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           date: dateStr,
-          moves: movesLogRef.current,
+          score: scoreRef.current,
+          highestTile: getHighestTile(boardRef.current),
+          movesCount: movesCountRef.current,
           durationSeconds,
+          moves: movesLogRef.current,
         }),
       });
       setDailyPlayed(true);
@@ -432,7 +460,7 @@ export default function GameScreen() {
     return () => {
       window.removeEventListener("message", handleAuthMessage);
     };
-  }, [fetchPlayerSession, fetchGlobalRanking, checkDailyStatus]);
+  }, []);
 
   // Mode: Time Rush countdown interval
   useEffect(() => {

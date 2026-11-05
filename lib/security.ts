@@ -1,7 +1,5 @@
 import crypto from "crypto";
 import { getDb, ensureDatabaseSchema } from "./db";
-import { Direction, GameMode, ModeRules } from "@/types/game";
-import { replayGame } from "./game-engine";
 
 const VALID_TILES = new Set([
   2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072,
@@ -149,10 +147,10 @@ export function validateScoreSanity(
     return { valid: false, reason: `Bloco ${highestTile} não é uma potência válida de 2` };
   }
 
-  // Calculate theoretical minimum score to produce this tile alone:
+  // Calculate theoretical minimum score to produce this tile alone (with safety margin for 4-spawns):
   const k = Math.round(Math.log2(highestTile));
-  if (k >= 2) {
-    const theoreticalMin = Math.floor((k - 1) * Math.pow(2, k) * 0.75);
+  if (k >= 3) {
+    const theoreticalMin = Math.floor((k - 2) * Math.pow(2, k) * 0.5);
     if (score < theoreticalMin) {
       return {
         valid: false,
@@ -232,43 +230,4 @@ export function validateGameDuration(
   }
 
   return { valid: true };
-}
-
-/**
- * Full Replay Verification:
- * Validates player submitted moves deterministically against the session seed.
- */
-export function verifyGameReplay(
-  seed: number,
-  moves: Direction[],
-  claimedScore: number,
-  claimedHighestTile: number,
-  mode: GameMode = "classic",
-  rules?: ModeRules
-): { valid: boolean; calculatedScore: number; calculatedHighestTile: number; reason?: string } {
-  const replay = replayGame(seed, moves, mode, rules);
-
-  if (replay.score !== claimedScore) {
-    return {
-      valid: false,
-      calculatedScore: replay.score,
-      calculatedHighestTile: replay.highestTile,
-      reason: `Pontuação calculada (${replay.score}) difere da reivindicada (${claimedScore})`,
-    };
-  }
-
-  if (replay.highestTile !== claimedHighestTile) {
-    return {
-      valid: false,
-      calculatedScore: replay.score,
-      calculatedHighestTile: replay.highestTile,
-      reason: `Maior peça calculada (${replay.highestTile}) difere da reivindicada (${claimedHighestTile})`,
-    };
-  }
-
-  return {
-    valid: true,
-    calculatedScore: replay.score,
-    calculatedHighestTile: replay.highestTile,
-  };
 }

@@ -141,13 +141,14 @@ export function DailyCalendarDialog({
         }
         if (data?.userHistory && Array.isArray(data.userHistory)) {
           for (const item of data.userHistory) {
+            const existingLocal = map[item.date];
             map[item.date] = {
               id: item.id,
               date: item.date,
-              score: item.score,
-              highestTile: item.highestTile,
-              movesCount: item.movesCount,
-              durationSeconds: item.durationSeconds,
+              score: Math.max(existingLocal?.score || 0, item.score),
+              highestTile: Math.max(existingLocal?.highestTile || 0, item.highestTile),
+              movesCount: existingLocal?.score && existingLocal.score > item.score ? existingLocal.movesCount : item.movesCount,
+              durationSeconds: existingLocal?.score && existingLocal.score > item.score ? existingLocal.durationSeconds : item.durationSeconds,
               createdAt: item.createdAt,
             };
           }
